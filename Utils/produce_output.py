@@ -12,17 +12,21 @@ def draw(num):
 
 	fig, axs = plt.subplots(2, 1)
 	fig.tight_layout(pad=1.5)
-	axs[0].hist(np.arange(args.T), weights=leaving_time / np.sum(leaving_time))
+	axs[0].bar(np.arange(args.T), leaving_time / np.sum(leaving_time), align='center')
 	axs[0].set_xlabel('Time')
 	axs[0].set_ylabel('Percentage')
-	axs[1].hist(np.arange(args.F + args.Q), weights=leaving_payment / np.sum(leaving_payment))
+	axs[1].bar(np.arange(args.Q + 1), leaving_payment / np.sum(leaving_payment), align='center')
 	axs[1].set_xlabel('Payment')
 	axs[1].set_ylabel('Percentage')
-	plt.savefig('counts.png')
+	plt.savefig(f'counts_{num}.png')
+
+	average_payment = np.sum(np.arange(args.Q + 1) * leaving_payment / np.sum(leaving_payment))
+	print(f'Average payment: {np.round(average_payment, 2)}, {np.round(100 * average_payment / args.F, 2)}% of F.')
 
 	os.chdir(root)
 
-draw(0)
+for i in range(10):
+	draw(i)
 
 
 

@@ -6,11 +6,10 @@ import random
 parser = argparse.ArgumentParser()
 # TF params
 parser.add_argument("--seed", default=42, type=int, help="Random seed for reproducibility.")
-parser.add_argument("--learning_rate", default=5e-2, type=float, help="Learning rate.")
+parser.add_argument("--learning_rate", default=1e-1, type=float, help="Learning rate.")
 
-parser.add_argument("--gamma", default=1, type=float, help="Return discounting.")
-parser.add_argument("--epsilon", default=0.05, type=float, help="Exploration rate.")
-parser.add_argument("--train_steps", default=4096, type=int, help="How many simulations to train from.")
+parser.add_argument("--train_steps", default=10_000, type=int, help="How many simulations to train from.")
+parser.add_argument("--eval_steps", default=1_000, type=int, help="How many simulations to train from.")
 
 # Queue parameters
 parser.add_argument("--F", default=4, type=int, help="End fine to pay.")
@@ -29,11 +28,31 @@ args = parser.parse_args([] if "__file__" not in globals() else None)
 np.random.seed(args.seed)
 
 
+def run(evaluate):
+	queue = Queue(args)
+	state = queue.initialize()
+	sims = args.train_steps if not evaluate else args.eval_steps
+	for sim in range(sims):
+		ws = w_table[state[:, 0], state[:, 1], state[:, 2], :]
+		ps = ws / np.sum(ws, axis=1, keepdims=True)
+
+		actions = np.apply_along_axis(lambda p: random.choices(np.arange(args.F+1), weights=p), arr=ps, axis=1)
+
+		next_state, removed = queue.step(actions)
+
+		if not evaluate:
+			update(w_table, removed)
+
+		state = next_state
+
+	return queue
+
+
 def update(w_table, removed):
 	for r in removed:
 		for t in range(r.t):
 			s = r.my_states[t]
-			costs = r.my_costs[t]
+			costs = r.my_costs[t] / (args.F + args.Q)  # Scale to [0, 1]
 
 			w_table[s[0], s[1], s[2], :] *= (1 - args.learning_rate * costs)
 
@@ -41,21 +60,13 @@ def update(w_table, removed):
 N_equal = (args.x_mean - args.k) * args.T
 w_table = np.ones(shape=(args.F, args.T, N_equal, args.F + 1))
 
-queue = Queue(args)
-state = queue.initialize()
-for _ in range(args.train_steps):
-	ws = w_table[state[:, 0], state[:, 1], state[:, 2], :]
-	ps = ws / np.sum(ws, axis=1, keepdims=True)
+for i in range(10):
+	run(evaluate=False)
+	queue = run(evaluate=True)
 
-	actions = np.apply_along_axis(lambda p: random.choices(np.arange(args.F+1), weights=p), arr=ps, axis=1)
+	queue.save(i)
 
-	next_state, removed = queue.step(actions)
-
-	update(w_table, removed)
-
-	state = next_state
-
-queue.save(0)
+np.save('weights.npy', w_table)
 
 
 

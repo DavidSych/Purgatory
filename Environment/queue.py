@@ -17,9 +17,8 @@ class Queue():
 
 		self.step_num = 0
 
-		max_payment = args.F + args.Q
 		self.leaving_time = np.zeros(shape=(args.T,), dtype=np.int)
-		self.leaving_payment = np.zeros(shape=(max_payment, ), dtype=np.int)
+		self.leaving_payment = np.zeros(shape=(args.Q + 1, ), dtype=np.int)
 
 		if full_cost:
 			self.fined_counts = np.zeros(shape=(self.F, self.T, self.N_equal, self.F+1), dtype=np.int16)
@@ -102,6 +101,7 @@ class Queue():
 		forgot_per_agent = np.random.uniform(0, 1, size=(len(self.agents, ))) <= np.array([a.p for a in self.agents])
 		for forgot, agent, action in zip(forgot_per_agent, self.agents, actions):
 			if not forgot:
+				action = min(action, self.F - agent.payment)  # I will not overpay
 				agent.payment += action
 				agent.my_rewards[agent.t] = - action
 			agent.t += 1

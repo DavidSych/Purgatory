@@ -28,6 +28,25 @@ args = parser.parse_args([] if "__file__" not in globals() else None)
 np.random.seed(args.seed)
 
 
+def run(evaluate):
+	queue = Queue(args)
+	state = queue.initialize()
+	for sim in range(args.train_steps):
+		qs = q_table[state[:, 0], state[:, 1], state[:, 2]]
+		greedy_actions = np.argmax(qs, axis=-1)
+		random_actions = np.random.randint(0, args.F, size=queue.num_agents)
+		actions = np.where(np.random.uniform(size=queue.num_agents) > args.epsilon, greedy_actions, random_actions)
+
+		next_state, removed = queue.step(actions)
+
+		if not evaluate:
+			train(q_table, removed)
+
+		state = next_state
+
+	return queue
+
+
 def train(q_table, removed):
 	for r in removed:
 		for t in range(r.t-1):
@@ -52,21 +71,11 @@ def train(q_table, removed):
 N_equal = (args.x_mean - args.k) * args.T
 q_table = np.zeros(shape=(args.F, args.T, N_equal, args.F + 1))
 
-queue = Queue(args)
-state = queue.initialize()
-for _ in range(args.train_steps):
-	qs = q_table[state[:, 0], state[:, 1], state[:, 2]]
-	greedy_actions = np.argmax(qs, axis=-1)
-	random_actions = np.random.randint(0, args.F, size=queue.num_agents)
-	actions = np.where(np.random.uniform(size=queue.num_agents) > args.epsilon, greedy_actions, random_actions)
+run(evaluate=False)
+queue = run(evaluate=True)
 
-	next_state, removed = queue.step(actions)
-
-	train(q_table, removed)
-
-	state = next_state
-
-
+queue.save(0)
+np.save('q_values.npy', q_table)
 
 
 
