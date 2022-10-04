@@ -1,15 +1,19 @@
+import os
+
 import numpy as np
 from Simulations.Environment.queue import Queue
 import argparse
-import random
+import random, datetime
+import pickle, shutil, time
 
 parser = argparse.ArgumentParser()
 # TF params
 parser.add_argument("--seed", default=42, type=int, help="Random seed for reproducibility.")
 parser.add_argument("--learning_rate", default=1e-1, type=float, help="Learning rate.")
+parser.add_argument("--cost_samples", default=10, type=int, help="Monte carlo simulations to approximate cost of an action.")
 
-parser.add_argument("--train_steps", default=10_000, type=int, help="How many simulations to train from.")
-parser.add_argument("--eval_steps", default=1_000, type=int, help="How many simulations to train from.")
+parser.add_argument("--train_steps", default=1_000, type=int, help="How many simulations to train for.")
+parser.add_argument("--train_sims", default=1, type=int, help="How many times to save progress.")
 
 # Queue parameters
 parser.add_argument("--F", default=4, type=int, help="End fine to pay.")
@@ -26,22 +30,30 @@ parser.add_argument("--beta", default=4, type=float, help="Parameter of Beta dis
 args = parser.parse_args([] if "__file__" not in globals() else None)
 
 np.random.seed(args.seed)
+path = os.getcwd()
+os.chdir(f'../Results/PW')
+dir_name = f'{str(datetime.datetime.now().date())}_{str(datetime.datetime.now().time())[:5].replace(":", "-")}'
+os.mkdir(dir_name)
+os.chdir(dir_name)
+pickle.dump(args, open("args.pickle", "wb"))
+
+parent = '/'.join(path.split('/')[:-1])
+shutil.copy(path + '/poly_weights.py', parent + '/Results/PW/' + dir_name)
 
 
-def run(evaluate):
-	queue = Queue(args)
+def run(w_table):
+	queue = Queue(args, full_cost=True)
 	state = queue.initialize()
-	sims = args.train_steps if not evaluate else args.eval_steps
+	sims = args.train_steps
 	for sim in range(sims):
 		ws = w_table[state[:, 0], state[:, 1], state[:, 2], :]
 		ps = ws / np.sum(ws, axis=1, keepdims=True)
 
 		actions = np.apply_along_axis(lambda p: random.choices(np.arange(args.F+1), weights=p), arr=ps, axis=1)
 
-		next_state, removed = queue.step(actions)
+		next_state, removed = queue.step(actions, w_table / np.sum(w_table, axis=3, keepdims=True))
 
-		if not evaluate:
-			update(w_table, removed)
+		update(w_table, removed)
 
 		state = next_state
 
@@ -61,12 +73,10 @@ N_equal = (args.x_mean - args.k) * args.T
 w_table = np.ones(shape=(args.F, args.T, N_equal, args.F + 1))
 
 for i in range(10):
-	run(evaluate=False)
-	queue = run(evaluate=True)
+	run(w_table)
 
-	queue.save(i)
-
-np.save('weights.npy', w_table)
+	policy = w_table / np.sum(w_table, axis=-1, keepdims=True)
+	np.save(f'policy_{i}.npy', policy)
 
 
 
