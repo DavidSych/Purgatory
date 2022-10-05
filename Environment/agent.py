@@ -12,6 +12,8 @@ class Agent:
 
 		# Storing agent's trajectory, (0) running payment, (1) my t, (2) my position
 		self.my_states = np.zeros((args.T, 3), dtype=np.int)
+		# If agent was allowed to act or not
+		self.acting = np.zeros((args.T, ), np.int)
 		# Storing agent's rewards and costs
 		self.my_rewards = np.zeros(args.T)
 		self.my_costs = np.zeros((args.T, args.F + 1))

@@ -107,7 +107,8 @@ class Queue():
 		Main method of the game, accepting actions for each agent and simulating a game day.
 
 		:param actions: np.array[len_queue before step] of {0, ... F} of desired actions if agents doesn't forget
-			   policy np.array[len queue before step, F+1] probability of actions for every state
+			   policy np.array[len queue before step, F+1] probability of actions for every stat. If not provided,
+			   		the cost is not computed.
 		:return: next_states: np.array[len_queue, 3] states in order [f, t, position]
 				 rewards: np.array[len_queue before step] negative of action plus Q if fined in this step
 				 costs: np.array[len_queue before step, F+1] negative of action + probability of fined * Q
@@ -128,6 +129,7 @@ class Queue():
 				action = min(action, self.F - agent.payment)  # I will not overpay
 				agent.payment += action
 				agent.my_rewards[agent.t] = - action
+				agent.acting[agent.t] = 1
 			agent.t += 1
 
 		# Sort by current average payment
