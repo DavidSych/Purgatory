@@ -1,6 +1,6 @@
 import numpy as np
 from Simulations.Environment.queue import Queue
-import argparse
+import argparse, os, shutil, datetime, pickle
 
 parser = argparse.ArgumentParser()
 # TF params
@@ -9,7 +9,8 @@ parser.add_argument("--learning_rate", default=5e-2, type=float, help="Learning 
 
 parser.add_argument("--gamma", default=1, type=float, help="Return discounting.")
 parser.add_argument("--epsilon", default=0.05, type=float, help="Exploration rate.")
-parser.add_argument("--train_steps", default=128, type=int, help="How many simulations to train from.")
+parser.add_argument("--train_steps", default=10_000, type=int, help="How many simulations to train from.")
+parser.add_argument("--train_sims", default=128, type=int, help="How many times to save progress.")
 
 # Queue parameters
 parser.add_argument("--F", default=4, type=int, help="End fine to pay.")
@@ -26,9 +27,18 @@ parser.add_argument("--beta", default=4, type=float, help="Parameter of Beta dis
 args = parser.parse_args([] if "__file__" not in globals() else None)
 
 np.random.seed(args.seed)
+path = os.getcwd()
+os.chdir(f'../Results/Q')
+dir_name = f'{str(datetime.datetime.now().date())}_{str(datetime.datetime.now().time())[:5].replace(":", "-")}'
+os.mkdir(dir_name)
+os.chdir(dir_name)
+pickle.dump(args, open("args.pickle", "wb"))
+
+parent = '/'.join(path.split('/')[:-1])
+shutil.copy(path + '/tabular_q.py', parent + '/Results/Q/' + dir_name)
 
 
-def run(evaluate):
+def run():
 	queue = Queue(args)
 	state = queue.initialize()
 	for sim in range(args.train_steps):
@@ -39,8 +49,7 @@ def run(evaluate):
 
 		next_state, removed = queue.step(actions)
 
-		if not evaluate:
-			train(q_table, removed)
+		train(q_table, removed)
 
 		state = next_state
 
@@ -71,13 +80,17 @@ def train(q_table, removed):
 N_equal = (args.x_mean - args.k) * args.T
 q_table = np.zeros(shape=(args.F, args.T, N_equal, args.F + 1))
 
-run(evaluate=False)
-queue = run(evaluate=True)
+for i in range(args.train_sims):
+	run()
 
-queue.save(0)
+	policy = np.zeros_like(q_table.reshape((-1, args.F+1)))
+	greedy = np.argmax(q_table.reshape((-1, args.F+1)), axis=-1)
+	policy[np.arange(policy.shape[0]), greedy] = 1 - (args.F + 1) * args.epsilon
+	policy[:, :] += args.epsilon
+	np.save(f'policy_{i}.npy', policy.reshape(q_table.shape))
+	print(f'Saving progress ({i+1}/{args.train_sims}).')
+
 np.save('q_values.npy', q_table)
-
-
 
 
 

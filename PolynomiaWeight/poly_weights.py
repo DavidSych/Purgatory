@@ -72,13 +72,14 @@ def update(w_table, removed):
 N_equal = (args.x_mean - args.k) * args.T
 w_table = np.ones(shape=(args.F, args.T, N_equal, args.F + 1))
 
-for i in range(10):
+for i in range(args.train_sims):
 	run(w_table)
 
 	policy = w_table / np.sum(w_table, axis=-1, keepdims=True)
 	np.save(f'policy_{i}.npy', policy)
+	print(f'Saving progress ({i+1}/{args.train_sims}).')
 
-
+np.save('weights.npy', w_table)
 
 
 
