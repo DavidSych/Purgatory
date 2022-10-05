@@ -4,6 +4,7 @@ from network import Actor, Critic
 import argparse, datetime, shutil
 import pickle, random, os
 import torch
+from Simulations.Utils.misc import queue_saver, policy_saver
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -19,12 +20,12 @@ parser.add_argument("--entropy_weight", default=1e-2, type=float, help="Entropy 
 parser.add_argument("--l2", default=1e-2, type=float, help="L2 regularization constant.")
 parser.add_argument("--clip_norm", default=0.1, type=float, help="Gradient clip norm.")
 
-parser.add_argument("--buffer_len", default=20_000, type=int, help="Number of time steps to train on.")
+parser.add_argument("--buffer_len", default=10_000, type=int, help="Number of time steps to train on.")
 parser.add_argument("--epsilon", default=0.05, type=float, help="Clipping constant.")
 parser.add_argument("--gamma", default=1, type=float, help="Return discounting.")
 parser.add_argument("--_lambda", default=0.97, type=float, help="Advantage discounting.")
 parser.add_argument("--train_cycles", default=64, type=int, help="Number of PPO passes.")
-parser.add_argument("--train_sims", default=128, type=int, help="How many simulations to train from.")
+parser.add_argument("--train_sims", default=32, type=int, help="How many simulations to train from.")
 parser.add_argument("--evaluate", default=False, type=bool, help="If NashConv should be computed as well.")
 
 # Queue parameters
@@ -108,7 +109,8 @@ for i in range(args.train_sims):
 
 	train(buffer)
 
-	np.save(f'policy_{i}.npy', policy.reshape((queue.F, queue.T, queue.N_equal, queue.F+1)))
+	policy_saver(policy.reshape((queue.F, queue.T, queue.N_equal, queue.F+1)), i)
+	queue_saver(queue, i)
 	print(f'Saving progress ({i+1}/{args.train_sims}).')
 
 

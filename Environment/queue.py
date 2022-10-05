@@ -95,12 +95,9 @@ class Queue():
 		return len(self.agents)
 
 	def save(self, num):
-		root = os.getcwd()
-		os.chdir('../Results')
 		np.save(f'leaving_time_{num}.npy', self.leaving_time)
 		np.save(f'leaving_payment_{num}.npy', self.leaving_payment)
 		pickle.dump(self.args, open('args.pickle', 'wb'))
-		os.chdir(root)
 
 	def step(self, actions, policy=None):
 		'''

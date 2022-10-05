@@ -5,6 +5,7 @@ from Simulations.Environment.queue import Queue
 import argparse
 import random, datetime
 import pickle, shutil, time
+from Simulations.Utils.misc import queue_saver, policy_saver
 
 parser = argparse.ArgumentParser()
 # TF params
@@ -73,10 +74,12 @@ N_equal = (args.x_mean - args.k) * args.T
 w_table = np.ones(shape=(args.F, args.T, N_equal, args.F + 1))
 
 for i in range(args.train_sims):
-	run(w_table)
+	queue = run(w_table)
 
 	policy = w_table / np.sum(w_table, axis=-1, keepdims=True)
-	np.save(f'policy_{i}.npy', policy)
+
+	policy_saver(policy, i)
+	queue_saver(queue, i)
 	print(f'Saving progress ({i+1}/{args.train_sims}).')
 
 np.save('weights.npy', w_table)

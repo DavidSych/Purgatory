@@ -1,6 +1,7 @@
 import numpy as np
 from Simulations.Environment.queue import Queue
 import argparse, os, shutil, datetime, pickle
+from Simulations.Utils.misc import queue_saver, policy_saver
 
 parser = argparse.ArgumentParser()
 # TF params
@@ -81,13 +82,15 @@ N_equal = (args.x_mean - args.k) * args.T
 q_table = np.zeros(shape=(args.F, args.T, N_equal, args.F + 1))
 
 for i in range(args.train_sims):
-	run()
+	queue = run()
 
 	policy = np.zeros_like(q_table.reshape((-1, args.F+1)))
 	greedy = np.argmax(q_table.reshape((-1, args.F+1)), axis=-1)
 	policy[np.arange(policy.shape[0]), greedy] = 1 - (args.F + 1) * args.epsilon
 	policy[:, :] += args.epsilon
-	np.save(f'policy_{i}.npy', policy.reshape(q_table.shape))
+
+	policy_saver(policy.reshape((queue.F, queue.T, queue.N_equal, queue.F+1)), i)
+	queue_saver(queue, i)
 	print(f'Saving progress ({i+1}/{args.train_sims}).')
 
 np.save('q_values.npy', q_table)
