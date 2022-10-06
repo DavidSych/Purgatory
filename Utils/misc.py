@@ -2,26 +2,22 @@ import os
 import numpy as np
 
 
+def my_chdir(dir_name):
+	if not os.path.isdir(dir_name):
+		os.mkdir(dir_name)
+	os.chdir(dir_name)
+
+
 def queue_saver(queue, num):
 	root = os.getcwd()
-	try:
-		os.mkdir('queue_data')
-	except:
-		pass
-
-	os.chdir('queue_data')
+	my_chdir('queue_data')
 	queue.save(num)
 	os.chdir(root)
 
 
 def policy_saver(policy, num):
 	root = os.getcwd()
-	try:
-		os.mkdir('policies')
-	except:
-		pass
-
-	os.chdir('policies')
+	my_chdir('policies')
 	np.save(f'policy_{num}.npy', policy)
 	os.chdir(root)
 

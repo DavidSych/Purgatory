@@ -29,13 +29,13 @@ class Queue():
 		return self.state()
 
 	def state(self):
-		state = []
+		state = np.empty(shape=(self.num_agents, 3), dtype=int)
 		for position, agent in enumerate(self.agents):
-			s = [agent.payment, agent.t, min(position, self.N_equal - 1)]
-			state.append(s)
+			s = (agent.payment, agent.t, min(position, self.N_equal - 1))
+			state[position, :] = s
 			agent.my_states[agent.t, :] = s
 
-		return np.array(state, dtype=np.int)
+		return state
 
 	def add_agents(self):
 		to_add = int(np.random.normal(loc=self.x_mean, scale=self.x_std))
@@ -112,6 +112,7 @@ class Queue():
 		'''
 
 		self.step_num += 1
+		actions = actions.reshape((-1,)).astype(int)
 
 		# Compute rewards and approximate costs
 		if policy is not None:
@@ -121,7 +122,7 @@ class Queue():
 
 		# Take actions unless you forget
 		forgot_per_agent = np.random.uniform(0, 1, size=(len(self.agents, ))) <= np.array([a.p for a in self.agents])
-		for forgot, agent, action in zip(forgot_per_agent, self.agents, actions.reshape((-1,))):
+		for forgot, agent, action in zip(forgot_per_agent, self.agents, actions):
 			if not forgot:
 				action = min(action, self.F - agent.payment)  # I will not overpay
 				agent.payment += action

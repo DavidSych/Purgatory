@@ -1,4 +1,5 @@
 from Simulations.Environment.queue import Queue
+from Simulations.Utils.misc import my_chdir
 import numpy as np
 import os, pickle, random
 import matplotlib.pyplot as plt
@@ -36,11 +37,7 @@ def mean_return(return_sum, visit_count):
 def load_old(sim, return_sum, visit_count):
 	root = os.getcwd()
 	try:
-		os.mkdir('cce_data')
-	except:
-		pass
-	try:
-		os.chdir('cce_data')
+		my_chdir('cce_data')
 		old_returns = np.load(f'returns_{sim}.npy')
 		old_counts = np.load(f'counts_{sim}.npy')
 		return_sum += old_returns
@@ -57,16 +54,14 @@ def load_old(sim, return_sum, visit_count):
 
 
 algorithm = 'PPO'
-dir_name = '2022-10-05_10-41'
-steps = 1_000  # Steps in the queue to approximate everything with
+dir_name = '2022-10-05_21-00'
+steps = 1000  # Steps in the queue to approximate everything with
 
 os.chdir(f'../Results/{algorithm}/{dir_name}')
 args = pickle.load(open('args.pickle', 'rb'))
 np.random.seed(args.seed)
-try:
+if not os.path.isdir('figures'):
 	os.mkdir('figures')
-except:
-	pass
 
 cutoffs = np.arange(500)
 cut_regrets = np.zeros(shape=(args.train_sims, cutoffs.shape[0]))
@@ -106,7 +101,6 @@ plt.ylim((0, 1.5 * cut_regrets[0, -1]))
 cbar = plt.colorbar(mpl.cm.ScalarMappable(cmap=cmap), ax=plt.gca())
 cbar.set_ticks(np.arange(8) / 7)
 cbar.set_ticklabels(np.arange(0, args.train_sims, (args.train_sims - 1) / 7).astype(np.int32) + 1)
-plt.savefig(os.getcwd() + '/figures/regrets.png')
 plt.savefig(os.getcwd() + '/figures/regrets.pdf')
 plt.clf()
 
