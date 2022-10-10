@@ -13,6 +13,8 @@ class Actor(torch.nn.Module):
 		self.softmax = torch.nn.Softmax(dim=-1)
 
 		self.optimizer = torch.optim.Adam(self.parameters(), lr=args.actor_learning_rate)
+		for var in self.parameters():
+			print(var)
 
 	def forward(self, x):
 		x = self.linear_1(x)
@@ -33,9 +35,9 @@ class Actor(torch.nn.Module):
 		for var in self.parameters():
 			loss += self.l2 * torch.norm(var)
 
+		self.optimizer.zero_grad()
 		loss.backward()
 		self.optimizer.step()
-		self.optimizer.zero_grad()
 
 
 class Critic(torch.nn.Module):
@@ -44,11 +46,10 @@ class Critic(torch.nn.Module):
 		self.l2 = args.l2
 
 		self.linear_1 = torch.nn.Linear(3, args.hidden_layer_critic)
-		self.linear_2 = torch.nn.Linear(args.hidden_layer_critic, args.hidden_layer_critic)
-		self.linear_3 = torch.nn.Linear(args.hidden_layer_critic, args.F+1)
-
 		self.relu1 = torch.nn.ReLU()
+		self.linear_2 = torch.nn.Linear(args.hidden_layer_critic, args.hidden_layer_critic)
 		self.relu2 = torch.nn.ReLU()
+		self.linear_3 = torch.nn.Linear(args.hidden_layer_critic, 1)
 
 		self.optimizer = torch.optim.Adam(self.parameters(), lr=args.critic_learning_rate)
 
@@ -66,9 +67,9 @@ class Critic(torch.nn.Module):
 		for var in self.parameters():
 			loss += self.l2 * torch.norm(var)
 
+		self.optimizer.zero_grad()
 		loss.backward()
 		self.optimizer.step()
-		self.optimizer.zero_grad()
 
 
 

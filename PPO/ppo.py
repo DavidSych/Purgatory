@@ -20,19 +20,19 @@ parser.add_argument("--entropy_weight", default=1e-2, type=float, help="Entropy 
 parser.add_argument("--l2", default=1e-2, type=float, help="L2 regularization constant.")
 parser.add_argument("--clip_norm", default=0.1, type=float, help="Gradient clip norm.")
 
-parser.add_argument("--buffer_len", default=40_000, type=int, help="Number of time steps to train on.")
+parser.add_argument("--buffer_len", default=10_000, type=int, help="Number of time steps to train on.")
 parser.add_argument("--epsilon", default=0.05, type=float, help="Clipping constant.")
 parser.add_argument("--gamma", default=1, type=float, help="Return discounting.")
 parser.add_argument("--_lambda", default=0.97, type=float, help="Advantage discounting.")
-parser.add_argument("--train_cycles", default=128, type=int, help="Number of PPO passes.")
-parser.add_argument("--train_sims", default=256, type=int, help="How many simulations to train from.")
+parser.add_argument("--train_cycles", default=64, type=int, help="Number of PPO passes.")
+parser.add_argument("--train_sims", default=64, type=int, help="How many simulations to train from.")
 parser.add_argument("--evaluate", default=False, type=bool, help="If NashConv should be computed as well.")
 
 # Queue parameters
-parser.add_argument("--F", default=2, type=int, help="Amount to pay to leave queue.")
-parser.add_argument("--Q", default=2, type=int, help="End fine to pay.")
+parser.add_argument("--F", default=4, type=int, help="Amount to pay to leave queue.")
+parser.add_argument("--Q", default=4, type=int, help="End fine to pay.")
 parser.add_argument("--fined_penalty", default=0, type=int, help="Additional penalty for leaving due to a fine.")
-parser.add_argument("--T", default=2, type=int, help="Time to survive in queue.")
+parser.add_argument("--T", default=4, type=int, help="Time to survive in queue.")
 parser.add_argument("--k", default=5, type=int, help="How many people have to pay in each step.")
 parser.add_argument("--g", default=1, type=int, help="How many groups to use.")
 parser.add_argument("--tau", default=1, type=int, help="Don't use agents added to queue before tau * T steps.")
@@ -61,14 +61,14 @@ shutil.copy(path + '/ppo.py', parent + '/Results/PPO/' + dir_name)
 
 
 def train(buffer):
-	states = preprocess(buffer[:, :3])
-	states = torch.tensor(states.astype(np.float32))
-	values = critic(torch.tensor(buffer[:, :3].astype(np.float32)))
+	states = torch.tensor(buffer[:, :3].astype(np.float32))
+	#values = critic(states)
 	actions = torch.tensor(np.mod(buffer[:, 3], args.Q).astype(int))
 	policy = actor(states).detach()
 	old_probs = policy[torch.arange(states.shape[0]), actions]
 	returns = torch.tensor(buffer[:, 3].astype(np.float32))
-	advantage = returns - values.detach()
+	#advantage = returns - values.detach()
+	advantage = torch.tensor(buffer[:, 4].astype(np.float32))
 
 	for _ in range(args.train_cycles):
 		critic.train_iteration(states, returns)
@@ -76,6 +76,7 @@ def train(buffer):
 
 
 def preprocess(state):
+	state = state.astype(np.float32)
 	state[:, 0] = state[:, 0] / args.F
 	state[:, 1] = state[:, 1] / args.T
 	state[:, 2] = state[:, 2] / ((args.x_mean - args.k) * args.T)
@@ -89,23 +90,23 @@ for i in range(args.train_sims):
 	queue = Queue(args)
 	state = queue.initialize()
 	# (0-2) state, (3) returns, (4) advantage
-	buffer = np.zeros(shape=(args.buffer_len, 5))
+	buffer = np.zeros(shape=(args.buffer_len, 5), dtype=np.float32)
 	pointer = 0  # Where to write in the buffer
 	while pointer < args.buffer_len:
 		state = preprocess(state)
-		policy = actor(torch.tensor(state.astype(np.float32))).detach().numpy()
+		policy = actor(torch.tensor(state)).detach().numpy()
 		actions = np.apply_along_axis(lambda p: random.choices(np.arange(args.F+1), weights=p), arr=policy, axis=1)
 
 		state, removed = queue.step(actions)
 		for r in removed:
 			t_steps = np.arange(r.t)
 			is_acting = np.where(r.acting > 0)
-			r_states = r.my_states
-			rewards = r.my_rewards / (args.F + args.Q - 1)  # Scale the rewards to [0,1]
+			r_states = preprocess(r.my_states)
+			rewards = 1 + r.my_rewards / (args.F + args.Q - 1)  # Scale the rewards to [0,1]
 			returns = rewards * (args.gamma ** t_steps)
 			returns = np.cumsum(returns[::-1])[::-1] / (args.gamma ** t_steps)
 
-			values = critic(torch.tensor(r.my_states.astype(np.float32))).detach().numpy()
+			values = critic(torch.tensor(r_states)).detach().numpy()
 			values = np.append(values, 0)
 			td_error = rewards + args.gamma * values[1:] - values[:-1]
 			decay_factor = args.gamma * args._lambda
@@ -122,7 +123,6 @@ for i in range(args.train_sims):
 			pointer += to_add
 
 	all_states = np.mgrid[0:1:1 / queue.F, 0:1:1 / queue.T, 0:1:1 / queue.N_equal].transpose((1, 2, 3, 0)).reshape(-1, 3)
-	all_states = preprocess(all_states)
 	policy = actor(torch.tensor(all_states.astype(np.float32))).detach().numpy()
 
 	train(buffer)
