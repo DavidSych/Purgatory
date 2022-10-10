@@ -71,8 +71,8 @@ def train(buffer):
 	advantage = returns - values.detach()
 
 	for _ in range(args.train_cycles):
-		critic.train(states, returns)
-		actor.train(states, advantage, actions, old_probs)
+		critic.train_iteration(states, returns)
+		actor.train_iteration(states, advantage, actions, old_probs)
 
 
 def preprocess(state):

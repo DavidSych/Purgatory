@@ -20,7 +20,7 @@ class Actor(torch.nn.Module):
 		x = self.linear_2(x)
 		return self.softmax(x)
 
-	def train(self, x, advantage, actions, old_prob):
+	def train_iteration(self, x, advantage, actions, old_prob):
 		policy = self.forward(x)
 		probs = policy[torch.arange(policy.shape[0]), actions]
 
@@ -60,7 +60,7 @@ class Critic(torch.nn.Module):
 		y = self.linear_3(y)
 		return y[:, 0]
 
-	def train(self, x, y):
+	def train_iteration(self, x, y):
 		value = self.forward(x)
 		loss = torch.nn.MSELoss()(value, y)
 		for var in self.parameters():
