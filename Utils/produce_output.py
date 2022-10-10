@@ -44,13 +44,13 @@ def draw_leaving_counts(algorithm, folder):
 	root = os.getcwd()
 	os.chdir(f'../Results/{algorithm}/{folder}/queue_data')
 	args = pickle.load(open('args.pickle', 'rb'))
-	for num in range(args.train_sims):
+	for num in range(len(os.listdir(os.getcwd())) // 2):
 		leaving_time = np.load(f'leaving_time_{num}.npy')
 		leaving_payment = np.load(f'leaving_payment_{num}.npy')
 
 		fig, axs = plt.subplots(2, 1)
 		fig.tight_layout(pad=1.5)
-		axs[0].bar(np.arange(args.T), leaving_time / np.sum(leaving_time), align='center')
+		axs[0].bar(np.arange(args.T) + 1, leaving_time / np.sum(leaving_time), align='center')
 		axs[0].set_xlabel('Time')
 		axs[0].set_ylabel('Percentage')
 		axs[1].bar(np.arange(args.Q + 1), leaving_payment / np.sum(leaving_payment), align='center')
@@ -60,16 +60,18 @@ def draw_leaving_counts(algorithm, folder):
 		plt.clf()
 
 		average_payment = np.sum(np.arange(args.Q + 1) * leaving_payment / np.sum(leaving_payment))
-		print(f'Average payment: {np.round(average_payment, 2)}, {np.round(100 * average_payment / args.F, 2)}% of F.')
+		min_payment = args.Q * args.k / args.x_mean
+		payment = average_payment - min_payment
+		print(f'Average payment above minimum: {np.round(payment, 2)}, {np.round(100 * payment / args.F, 2)}% of F.')
 
 	os.chdir(root)
 
 
 algorithm = 'PPO'
-folder = '2022-10-05_21-00'
+folder = '2022-10-06_09-38'
 prepare_folders(algorithm, folder)
-#draw_leaving_counts(algorithm, folder)
 draw_final_policy(algorithm, folder)
+draw_leaving_counts(algorithm, folder)
 
 
 

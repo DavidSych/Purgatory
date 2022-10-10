@@ -54,10 +54,10 @@ def load_old(sim, return_sum, visit_count):
 
 
 algorithm = 'PPO'
-dir_name = '2022-10-05_21-00'
-steps = 1000  # Steps in the queue to approximate everything with
+folder = '2022-10-06_09-38'
+steps = 100  # Steps in the queue to approximate everything with
 
-os.chdir(f'../Results/{algorithm}/{dir_name}')
+os.chdir(f'../Results/{algorithm}/{folder}')
 args = pickle.load(open('args.pickle', 'rb'))
 np.random.seed(args.seed)
 if not os.path.isdir('figures'):
@@ -67,8 +67,9 @@ cutoffs = np.arange(500)
 cut_regrets = np.zeros(shape=(args.train_sims, cutoffs.shape[0]))
 
 cmap = mpl.cm.get_cmap('Spectral')
+plt.grid(0.25)
 
-for sim in range(args.train_sims):
+for sim in range(len(os.listdir(os.getcwd() + '/policies'))):
 	print(f'Working on simulation {sim + 1}.')
 	queue = Queue(args)
 	policy = np.load(os.getcwd() + f'/policies/policy_{sim}.npy')
@@ -102,6 +103,9 @@ cbar = plt.colorbar(mpl.cm.ScalarMappable(cmap=cmap), ax=plt.gca())
 cbar.set_ticks(np.arange(8) / 7)
 cbar.set_ticklabels(np.arange(0, args.train_sims, (args.train_sims - 1) / 7).astype(np.int32) + 1)
 plt.savefig(os.getcwd() + '/figures/regrets.pdf')
+
+plt.yscale('log')
+plt.savefig(os.getcwd() + '/figures/regrets_log.pdf')
 plt.clf()
 
 print(f'Final epsilon is {cut_regrets[-1, -1]}')
