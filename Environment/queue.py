@@ -54,7 +54,7 @@ class Queue():
 			a = self.agents[i]
 			removed.append(a)
 			a.payment += self.Q
-			a.my_rewards[a.t] -= self.Q
+			a.my_rewards[a.t-1] -= self.Q
 			self.agents.pop(i)
 
 		for r in removed:
