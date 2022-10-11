@@ -13,8 +13,6 @@ class Actor(torch.nn.Module):
 		self.softmax = torch.nn.Softmax(dim=-1)
 
 		self.optimizer = torch.optim.Adam(self.parameters(), lr=args.actor_learning_rate)
-		for var in self.parameters():
-			print(var)
 
 	def forward(self, x):
 		x = self.linear_1(x)

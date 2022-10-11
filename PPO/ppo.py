@@ -25,7 +25,7 @@ parser.add_argument("--epsilon", default=0.05, type=float, help="Clipping consta
 parser.add_argument("--gamma", default=1, type=float, help="Return discounting.")
 parser.add_argument("--_lambda", default=0.97, type=float, help="Advantage discounting.")
 parser.add_argument("--train_cycles", default=64, type=int, help="Number of PPO passes.")
-parser.add_argument("--train_sims", default=64, type=int, help="How many simulations to train from.")
+parser.add_argument("--train_sims", default=32, type=int, help="How many simulations to train from.")
 parser.add_argument("--evaluate", default=False, type=bool, help="If NashConv should be computed as well.")
 
 # Queue parameters
@@ -62,12 +62,10 @@ shutil.copy(path + '/ppo.py', parent + '/Results/PPO/' + dir_name)
 
 def train(buffer):
 	states = torch.tensor(buffer[:, :3].astype(np.float32))
-	#values = critic(states)
 	actions = torch.tensor(np.mod(buffer[:, 3], args.Q).astype(int))
 	policy = actor(states).detach()
 	old_probs = policy[torch.arange(states.shape[0]), actions]
 	returns = torch.tensor(buffer[:, 3].astype(np.float32))
-	#advantage = returns - values.detach()
 	advantage = torch.tensor(buffer[:, 4].astype(np.float32))
 
 	for _ in range(args.train_cycles):
