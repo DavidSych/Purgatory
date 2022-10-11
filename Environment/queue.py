@@ -6,12 +6,11 @@ import copy, random
 
 
 class Queue():
-	def __init__(self, args, full_cost=False):
+	def __init__(self, args):
 		self.k = args.k
 		self.F = args.F
 		self.Q = args.Q
 		self.T = args.T
-		self.full_cost = full_cost  # If we want to compute cost of every action
 		self.x_mean, self.x_std = args.x_mean, args.x_std
 		self.args = args
 		self.N_equal = (args.x_mean - args.k) * args.T
@@ -20,9 +19,6 @@ class Queue():
 
 		self.leaving_time = np.zeros(shape=(args.T, ), dtype=np.int)
 		self.leaving_payment = np.zeros(shape=(args.Q + 1, ), dtype=np.int)
-
-		if full_cost:
-			self.cost_samples = args.cost_samples
 
 	def initialize(self):
 		self.agents = [Agent(self.args) for _ in range(self.x_mean)]
@@ -64,32 +60,6 @@ class Queue():
 
 		return removed
 
-	def approximate_costs(self, policy):
-		costs = np.zeros(shape=(self.cost_samples, len(self.agents), self.F+1))
-		for i, agent in enumerate(self.agents):
-			for a in range(self.F+1):
-				for t in range(self.cost_samples):
-					queue_copy = copy.deepcopy(self)
-					tracked_agent = queue_copy.agents[i]
-					starting_reward = np.sum(tracked_agent.my_rewards)
-
-					state, removed = queue_copy.state(), []
-					ps = policy[state[:, 0], state[:, 1], state[:, 2], :]
-					actions = np.apply_along_axis(lambda p: random.choices(np.arange(self.F + 1), weights=p), arr=ps, axis=1)
-					actions[i] = a  # We fix the first action and let the agent sample the rest
-
-					state, removed = queue_copy.step(actions)
-
-					while not tracked_agent in removed:
-						ps = policy[state[:, 0], state[:, 1], state[:, 2], :]
-						actions = np.apply_along_axis(lambda p: random.choices(np.arange(self.F+1), weights=p), arr=ps, axis=1)
-						state, removed = queue_copy.step(actions)
-
-					cost = - (np.sum(tracked_agent.my_rewards) - starting_reward)
-					costs[t, i, a] = cost
-
-		return np.mean(costs, axis=0)
-
 	@property
 	def num_agents(self):
 		return len(self.agents)
@@ -99,7 +69,7 @@ class Queue():
 		np.save(f'leaving_payment_{num}.npy', self.leaving_payment)
 		pickle.dump(self.args, open('args.pickle', 'wb'))
 
-	def step(self, actions, policy=None):
+	def step(self, actions):
 		'''
 		Main method of the game, accepting actions for each agent and simulating a game day.
 
@@ -113,12 +83,6 @@ class Queue():
 
 		self.step_num += 1
 		actions = actions.reshape((-1,)).astype(int)
-
-		# Compute rewards and approximate costs
-		if policy is not None:
-			costs = self.approximate_costs(policy)
-			for c, agent in zip(costs, self.agents):
-				agent.my_costs[agent.t, :] = c
 
 		# Take actions unless you forget
 		forgot_per_agent = np.random.uniform(0, 1, size=(len(self.agents, ))) <= np.array([a.p for a in self.agents])

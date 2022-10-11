@@ -11,10 +11,10 @@ parser = argparse.ArgumentParser()
 # TF params
 parser.add_argument("--seed", default=42, type=int, help="Random seed for reproducibility.")
 parser.add_argument("--learning_rate", default=1e-1, type=float, help="Learning rate.")
-parser.add_argument("--cost_samples", default=10, type=int, help="Monte carlo simulations to approximate cost of an action.")
+parser.add_argument("--min_visit_count", default=1, type=int, help="Minimum number of visits to consider estimated cost during policy update")
 
 parser.add_argument("--train_steps", default=1_000, type=int, help="How many simulations to train for.")
-parser.add_argument("--train_sims", default=1, type=int, help="How many times to save progress.")
+parser.add_argument("--train_sims", default=1024, type=int, help="How many times to save progress.")
 
 # Queue parameters
 parser.add_argument("--F", default=4, type=int, help="End fine to pay.")
@@ -42,8 +42,10 @@ parent = '/'.join(path.split('/')[:-1])
 shutil.copy(path + '/poly_weights.py', parent + '/Results/PW/' + dir_name)
 
 
-def run(w_table):
-	queue = Queue(args, full_cost=True)
+def run(args, w_table):
+	tot_costs = np.zeros(w_table.shape, dtype=np.float32)
+	tot_counts = np.zeros(w_table.shape, dtype=np.int32)
+	queue = Queue(args)
 	state = queue.initialize()
 	sims = args.train_steps
 	for sim in range(sims):
@@ -52,29 +54,33 @@ def run(w_table):
 
 		actions = np.apply_along_axis(lambda p: random.choices(np.arange(args.F+1), weights=p), arr=ps, axis=1)
 
-		next_state, removed = queue.step(actions, w_table / np.sum(w_table, axis=3, keepdims=True))
+		state, removed = queue.step(actions)
 
-		update(w_table, removed)
+		for r in removed:
+			states = r.my_states
+			actions = np.mod(r.my_rewards, args.Q).astype(int)
+			cost = - np.cumsum(r.my_rewards[::-1])[::-1]
+			cost /= args.Q + args.F - 1  # Normalize cost to [0, 1]
+			for s, a, c in zip(states, actions, cost):
+				tot_costs[s[0], s[1], s[2], a] += c
+				tot_counts[s[0], s[1], s[2], a] += 1
 
-		state = next_state
+	visited = np.where(tot_counts >= args.min_visit_count)
+	tot_costs[visited] = tot_costs[visited] / tot_counts[visited]
+	return tot_costs, queue
 
-	return queue
 
-
-def update(w_table, removed):
-	for r in removed:
-		for t in range(r.t):
-			s = r.my_states[t]
-			costs = r.my_costs[t] / (args.F + args.Q)  # Scale to [0, 1]
-
-			w_table[s[0], s[1], s[2], :] *= (1 - args.learning_rate * costs)
+def update(w_table, costs):
+	w_table *= (1 - args.learning_rate * costs)
+	return w_table
 
 
 N_equal = (args.x_mean - args.k) * args.T
 w_table = np.ones(shape=(args.F, args.T, N_equal, args.F + 1))
 
 for i in range(args.train_sims):
-	queue = run(w_table)
+	costs, queue = run(args, w_table)
+	w_table = update(w_table, costs)
 
 	policy = w_table / np.sum(w_table, axis=-1, keepdims=True)
 
