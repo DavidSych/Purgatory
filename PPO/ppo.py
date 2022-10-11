@@ -30,7 +30,7 @@ parser.add_argument("--evaluate", default=False, type=bool, help="If NashConv sh
 
 # Queue parameters
 parser.add_argument("--F", default=4, type=int, help="Amount to pay to leave queue.")
-parser.add_argument("--Q", default=4, type=int, help="End fine to pay.")
+parser.add_argument("--Q", default=10, type=int, help="End fine to pay.")
 parser.add_argument("--fined_penalty", default=0, type=int, help="Additional penalty for leaving due to a fine.")
 parser.add_argument("--T", default=4, type=int, help="Time to survive in queue.")
 parser.add_argument("--k", default=5, type=int, help="How many people have to pay in each step.")

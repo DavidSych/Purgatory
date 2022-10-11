@@ -67,8 +67,8 @@ def draw_leaving_counts(algorithm, folder):
 	os.chdir(root)
 
 
-algorithm = 'PPO'
-folder = '2022-10-06_09-38'
+algorithm = 'PW'
+folder = '2022-10-10_21-55'
 prepare_folders(algorithm, folder)
 draw_final_policy(algorithm, folder)
 draw_leaving_counts(algorithm, folder)

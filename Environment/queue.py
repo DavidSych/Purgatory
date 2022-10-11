@@ -17,41 +17,51 @@ class Queue():
 
 		self.step_num = 0
 
-		self.leaving_time = np.zeros(shape=(args.T, ), dtype=np.int)
-		self.leaving_payment = np.zeros(shape=(args.Q + 1, ), dtype=np.int)
+		self.leaving_time = np.zeros(shape=(args.T, ), dtype=np.int32)
+		self.leaving_payment = np.zeros(shape=(args.Q + 1, ), dtype=np.int32)
 
 	def initialize(self):
 		self.agents = [Agent(self.args) for _ in range(self.x_mean)]
-		return self.state()
+		# Payment (0), time (1), position (2), if was acting (3) and reward (4)
+		self.state = np.zeros(shape=(self.x_mean, 5), dtype=np.int32)
+		return self.state
 
-	def state(self):
-		state = np.empty(shape=(self.num_agents, 3), dtype=int)
-		for position, agent in enumerate(self.agents):
-			s = (agent.payment, agent.t, min(position, self.N_equal - 1))
-			state[position, :] = s
-			agent.my_states[agent.t, :] = s
-
-		return state
+	def update_state(self):
+		for state, agent in zip(self.state, self.agents):
+			agent.my_states[agent.t, :] = state
 
 	def add_agents(self):
 		to_add = int(np.random.normal(loc=self.x_mean, scale=self.x_std))
 		for _ in range(to_add):
-			new_agent = Agent(self.args)
-			self.agents.append(new_agent)
+			self.agents.append(Agent(self.args))
+
+		zeros = np.zeros(shape=(to_add, 5), dtype=np.int32)
+		zeros[:, 2] = np.arange(to_add) + self.state.shape[0]
+		print(self.state.shape, zeros.shape)
+		self.state = np.concatenate([self.state, zeros], axis=0)
 
 	def remove_agents(self):
 		removed = []
-		for i in reversed(range(len(self.agents))):
-			if self.agents[i].t >= self.T or self.agents[i].payment >= self.F:
-				removed.append(self.agents[i])
-				self.agents.pop(i)
+		survived = np.where(self.state[:, 1] >= self.T)[0]
+		paid = np.where(self.state[:, 0] >= self.F)[0]
+		fined = np.arange(self.k)
 
-		for i in reversed(range(min(self.k, len(self.agents)))):
+		for i in survived:
+			removed.append(self.agents[i])
+			self.agents.pop(i)
+		self.state = self.state[np.where(self.state[:, 1] < self.T)]
+
+		for i in paid:
+			removed.append(self.agents[i])
+			self.agents.pop(i)
+		self.state = self.state[np.where(self.state[:, 0] < self.F)]
+
+		for i in fined:
 			a = self.agents[i]
 			removed.append(a)
-			a.payment += self.Q
-			a.my_rewards[a.t-1] -= self.Q
+			a.my_buffer[a.t-1, 4] -= self.Q
 			self.agents.pop(i)
+		self.state = self.state[self.k:]
 
 		for r in removed:
 			r.terminate()
@@ -86,17 +96,19 @@ class Queue():
 
 		# Take actions unless you forget
 		forgot_per_agent = np.random.uniform(0, 1, size=(len(self.agents, ))) <= np.array([a.p for a in self.agents])
-		for forgot, agent, action in zip(forgot_per_agent, self.agents, actions):
-			if not forgot:
-				action = min(action, self.F - agent.payment)  # I will not overpay
-				agent.payment += action
-				agent.my_rewards[agent.t] = - action
-				agent.acting[agent.t] = 1
-			agent.t += 1
+		masked_actions = actions * forgot_per_agent
+
+		self.state[:, 0] += masked_actions  # Increase payment of agents
+		self.state[:, 1] += 1  # Increase time for each agent
+		# Position will be modified later
+		self.state[:, 3] = 1 - forgot_per_agent  # If he was acting
+		self.state[:, 4] -= masked_actions  # Increase reward
 
 		# Sort by current average payment
-		new_order = np.argsort([agent.average_payment for agent in self.agents])
+		average_payment = self.state[:, 0] / self.state[:, 1]
+		new_order = np.argsort(average_payment)
 		self.agents = [self.agents[i] for i in new_order]
+		self.state = self.state[new_order]
 
 		# Remove agents who paid enough, survived for long enough and are at the first k spots
 		removed_agents = self.remove_agents()
@@ -104,9 +116,6 @@ class Queue():
 		# Add new agents in the queue
 		self.add_agents()
 
-		# Return current queue state for each agent and rewards & costs in the order of received `actions`
-		current_state = self.state()
-
-		return current_state, removed_agents
+		return self.state[:, :3], removed_agents
 
 

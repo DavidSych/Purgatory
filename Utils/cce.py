@@ -53,9 +53,9 @@ def load_old(sim, return_sum, visit_count):
 	return return_sum, visit_count
 
 
-algorithm = 'PPO'
-folder = '2022-10-06_09-38'
-steps = 100  # Steps in the queue to approximate everything with
+algorithm = 'PW'
+folder = '2022-10-10_21-55'
+steps = 1000  # Steps in the queue to approximate everything with
 
 os.chdir(f'../Results/{algorithm}/{folder}')
 args = pickle.load(open('args.pickle', 'rb'))
