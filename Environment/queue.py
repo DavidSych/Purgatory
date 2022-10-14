@@ -18,7 +18,7 @@ class Queue():
 		self.step_num = 0
 
 		self.leaving_time = np.zeros(shape=(args.T, ), dtype=np.int)
-		self.leaving_payment = np.zeros(shape=(args.Q + 1, ), dtype=np.int)
+		self.leaving_payment = np.zeros(shape=(args.Q + args.F - 1, ), dtype=np.int)
 
 	def initialize(self):
 		self.agents = [Agent(self.args) for _ in range(self.x_mean)]
