@@ -54,8 +54,10 @@ def load_old(sim, return_sum, visit_count):
 
 
 algorithm = 'PPO'
-folder = '2022-10-06_09-38'
-steps = 100  # Steps in the queue to approximate everything with
+folder = '2022-10-14_14-38'
+steps = 1000  # Steps in the queue to approximate everything with
+sim_skip = 16  # Evaluate only every _ simulation
+
 
 os.chdir(f'../Results/{algorithm}/{folder}')
 args = pickle.load(open('args.pickle', 'rb'))
@@ -63,19 +65,19 @@ np.random.seed(args.seed)
 if not os.path.isdir('figures'):
 	os.mkdir('figures')
 
-cutoffs = np.arange(500)
-cut_regrets = np.zeros(shape=(args.train_sims, cutoffs.shape[0]))
+cutoffs = np.arange(100)
+cut_regrets = np.zeros(shape=(args.train_sims // sim_skip, cutoffs.shape[0]))
 
 cmap = mpl.cm.get_cmap('Spectral')
 plt.grid(0.25)
 
-for sim in range(len(os.listdir(os.getcwd() + '/policies'))):
-	print(f'Working on simulation {sim + 1}.')
+for sim in range(len(os.listdir(os.getcwd() + '/policies')) // sim_skip):
+	print(f'Working on simulation {sim * sim_skip + 1}.')
 	queue = Queue(args)
-	policy = np.load(os.getcwd() + f'/policies/policy_{sim}.npy')
+	policy = np.load(os.getcwd() + f'/policies/policy_{sim * sim_skip}.npy')
 
 	return_sum, counts = sample_expectation(queue, steps, policy)
-	return_sum, counts = load_old(sim, return_sum, counts)
+	return_sum, counts = load_old(sim * sim_skip, return_sum, counts)
 	mean_returns = mean_return(return_sum, counts)
 
 	mean_returns = mean_returns.reshape((-1, args.F + 1))
@@ -94,11 +96,12 @@ for sim in range(len(os.listdir(os.getcwd() + '/policies'))):
 		regrets[low_visit_count] = 0
 		cut_regrets[sim, i] = np.max(regrets)
 
-	plt.plot(cutoffs, cut_regrets[sim], c=cmap(sim / args.train_sims))
+	plt.plot(cutoffs, cut_regrets[sim], c=cmap(sim * sim_skip / args.train_sims))
 
 plt.ylabel('Max Regret ($\epsilon$)')
 plt.xlabel('Minimum count')
-plt.ylim((0, 1.5 * cut_regrets[0, -1]))
+if cut_regrets[0, -1] > 0:
+	plt.ylim((0, 1.5 * cut_regrets[0, -1]))
 cbar = plt.colorbar(mpl.cm.ScalarMappable(cmap=cmap), ax=plt.gca())
 cbar.set_ticks(np.arange(8) / 7)
 cbar.set_ticklabels(np.arange(0, args.train_sims, (args.train_sims - 1) / 7).astype(np.int32) + 1)

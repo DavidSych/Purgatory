@@ -10,17 +10,18 @@ parser.add_argument("--learning_rate", default=5e-2, type=float, help="Learning 
 
 parser.add_argument("--gamma", default=1, type=float, help="Return discounting.")
 parser.add_argument("--epsilon", default=0.05, type=float, help="Exploration rate.")
-parser.add_argument("--train_steps", default=10_000, type=int, help="How many simulations to train from.")
-parser.add_argument("--train_sims", default=128, type=int, help="How many times to save progress.")
+parser.add_argument("--train_steps", default=1_000, type=int, help="How many simulations to train from.")
+parser.add_argument("--train_sims", default=32, type=int, help="How many times to save progress.")
 
 # Queue parameters
-parser.add_argument("--F", default=4, type=int, help="End fine to pay.")
+parser.add_argument("--F", default=2, type=int, help="End fine to pay.")
 parser.add_argument("--Q", default=4, type=int, help="End fine to pay.")
 parser.add_argument("--T", default=4, type=int, help="Time to survive in queue.")
 parser.add_argument("--k", default=5, type=int, help="How many people have to pay in each step.")
 parser.add_argument("--x_mean", default=100, type=float, help="Mean number of agents to add each step.")
 parser.add_argument("--x_std", default=5, type=float, help="Standard deviation of the number of agents to add each step.")
-parser.add_argument("--ignorance_distribution", default='uniform', type=str, help="What distribuin to use to sample probability of ignorance.")
+parser.add_argument("--ignorance_distribution", default='uniform', type=str, help="What distribuin to use to sample probability of ignorance. Supported: fixed, uniform, beta.")
+parser.add_argument("--p", default=0.5, type=float, help="Fixed probability of ignorance")
 parser.add_argument("--p_min", default=0.5, type=float, help="Parameter of uniform distribution of ignorance.")
 parser.add_argument("--alpha", default=2, type=float, help="Parameter of Beta distribution of ignorance.")
 parser.add_argument("--beta", default=4, type=float, help="Parameter of Beta distribution of ignorance.")
@@ -39,7 +40,7 @@ parent = '/'.join(path.split('/')[:-1])
 shutil.copy(path + '/tabular_q.py', parent + '/Results/Q/' + dir_name)
 
 
-def run():
+def run(q_table):
 	queue = Queue(args)
 	state = queue.initialize()
 	for sim in range(args.train_steps):
@@ -50,11 +51,11 @@ def run():
 
 		next_state, removed = queue.step(actions)
 
-		train(q_table, removed)
+		q_table = train(q_table, removed)
 
 		state = next_state
 
-	return queue
+	return queue, q_table
 
 
 def train(q_table, removed):
@@ -77,19 +78,23 @@ def train(q_table, removed):
 		target = (1 - args.learning_rate) * current_q + reward
 		q_table[s[0], s[1], s[2]] = target
 
+	return q_table
+
 
 N_equal = (args.x_mean - args.k) * args.T
-q_table = np.zeros(shape=(args.F, args.T, N_equal, args.F + 1))
+q_table = np.zeros(shape=(args.F, args.T, N_equal, args.F+1))
 
 for i in range(args.train_sims):
-	queue = run()
+	queue, q_table = run(q_table)
 
-	policy = np.zeros_like(q_table.reshape((-1, args.F+1)))
+	flat_q_table = q_table.reshape((-1, args.F+1))
+	policy = np.zeros_like(flat_q_table)
 	greedy = np.argmax(q_table.reshape((-1, args.F+1)), axis=-1)
-	policy[np.arange(policy.shape[0]), greedy] = 1 - (args.F + 1) * args.epsilon
-	policy[:, :] += args.epsilon
+	policy[np.arange(policy.shape[0]), greedy] = 1 - args.epsilon
+	policy[:, :] += args.epsilon / (args.F + 1)
+	policy = policy.reshape((args.F, args.T, queue.N_equal, args.F+1))
 
-	policy_saver(policy.reshape((queue.F, queue.T, queue.N_equal, queue.F+1)), i)
+	policy_saver(policy, i)
 	queue_saver(queue, i)
 	print(f'Saving progress ({i+1}/{args.train_sims}).')
 
