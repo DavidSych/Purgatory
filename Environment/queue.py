@@ -86,7 +86,7 @@ class Queue():
 
 		# Take actions unless you forget
 		forgot_per_agent = np.random.uniform(0, 1, size=(len(self.agents, ))) <= np.array([a.p for a in self.agents])
-		for forgot, agent, action in zip(forgot_per_agent, self.agents, actions):
+		for i, (forgot, agent, action) in enumerate(zip(forgot_per_agent, self.agents, actions)):
 			if not forgot:
 				action = min(action, self.F - agent.payment)  # I will not overpay
 				agent.payment += action
@@ -95,8 +95,7 @@ class Queue():
 			agent.t += 1
 
 		# Sort by current average payment
-		new_order = np.argsort([agent.average_payment for agent in self.agents])
-		self.agents = [self.agents[i] for i in new_order]
+		self.agents.sort(key=lambda agent: agent.average_payment, reverse=False)
 
 		# Remove agents who paid enough, survived for long enough and are at the first k spots
 		removed_agents = self.remove_agents()

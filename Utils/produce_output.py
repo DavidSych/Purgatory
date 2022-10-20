@@ -62,13 +62,13 @@ def draw_leaving_counts(algorithm, folder):
 		average_payment = np.sum(np.arange(args.Q + args.F - 1) * leaving_payment / np.sum(leaving_payment))
 		min_payment = args.Q * args.k / args.x_mean
 		payment = average_payment - min_payment
-		print(f'Average payment above minimum: {np.round(payment, 2)}, {np.round(100 * payment / args.F, 2)}% of F.')
+		print(f'Average payment above minimum: {np.round(payment, 2):.2f}, {np.round(100 * payment / args.F, 1):.1f}% of F.')
 
 	os.chdir(root)
 
 
 algorithm = 'PPO'
-folder = '2022-10-12_14-00'
+folder = '2022-10-19_21-32'
 prepare_folders(algorithm, folder)
 draw_final_policy(algorithm, folder)
 draw_leaving_counts(algorithm, folder)

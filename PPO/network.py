@@ -7,10 +7,7 @@ class Actor(torch.nn.Module):
 		super(Actor, self).__init__()
 		self.eps = args.epsilon
 		self.l2 = args.l2
-
-		dist = np.zeros(args.F + 1, dtype=np.float32)
-		dist[0] = 1
-		self.ignore_dist = torch.tensor(dist)
+		self.c_entropy = args.entropy_weight
 
 		self.linear_1 = torch.nn.Linear(3, args.hidden_layer_actor)
 		self.relu = torch.nn.ReLU()
@@ -25,18 +22,21 @@ class Actor(torch.nn.Module):
 		x = self.linear_2(x)
 		return self.softmax(x)
 
-	def train_iteration(self, x, advantage, actions, old_prob, p):
+	def train_iteration(self, x, advantage, actions, old_prob):
 		policy = self.forward(x)
+		print(policy.detach().numpy())
+		print(policy.shape)
+		print(actions)
 		probs = policy[torch.arange(policy.shape[0]), actions]
-		ignore_probs = self.ignore_dist[actions]
-		probs = (1 - p) * probs + p * ignore_probs
+		print(probs)
 
-		old_prob = (1 - p) * old_prob + p * ignore_probs
 		ratio = probs / old_prob
 
 		clipped_advantage = torch.where(advantage > 0, (1 + self.eps) * advantage, (1 - self.eps) * advantage)
 
 		loss = - torch.mean(torch.minimum(ratio * advantage, clipped_advantage))
+
+		loss += self.c_entropy * torch.mean(policy * torch.log(policy))
 
 		for var in self.parameters():
 			loss += self.l2 * torch.norm(var)

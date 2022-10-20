@@ -54,8 +54,8 @@ def load_old(sim, return_sum, visit_count):
 
 
 algorithm = 'PPO'
-folder = '2022-10-14_14-38'
-steps = 1000  # Steps in the queue to approximate everything with
+folder = '2022-10-19_21-32'
+steps = 2000  # Steps in the queue to approximate everything with
 sim_skip = 16  # Evaluate only every _ simulation
 
 
