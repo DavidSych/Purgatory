@@ -1,81 +1,97 @@
 import numpy as np
-import torch
+import tensorflow_probability as tfp
+import tensorflow as tf
 
 
-class Actor(torch.nn.Module):
+class Actor():
 	def __init__(self, args):
 		super(Actor, self).__init__()
 		self.eps = args.epsilon
+		self.c_ent = args.entropy_weight
 		self.l2 = args.l2
 
-		dist = np.zeros(args.F + 1, dtype=np.float32)
-		dist[0] = 1
-		self.ignore_dist = torch.tensor(dist)
+		self.get_model(args)
 
-		self.linear_1 = torch.nn.Linear(3, args.hidden_layer_actor)
-		self.relu = torch.nn.ReLU()
-		self.linear_2 = torch.nn.Linear(args.hidden_layer_actor, args.F+1)
-		self.softmax = torch.nn.Softmax(dim=-1)
+	def get_model(self, args):
+		inputs = tf.keras.Input(shape=(3, )) # My position (0, 1), what I payed so far (0, 1) and how much time I spent in queue (0, 1)
 
-		self.optimizer = torch.optim.Adam(self.parameters(), lr=args.actor_learning_rate)
+		y = tf.keras.layers.Dense(args.hidden_layer_actor, activation='relu')(inputs)
+		#y = tf.keras.layers.Dense(args.hidden_layer_size, activation='relu')(y)
+		actions = tf.keras.layers.Dense(args.F + 1, activation='softmax')(y)
 
-	def forward(self, x):
-		x = self.linear_1(x)
-		x = self.relu(x)
-		x = self.linear_2(x)
-		return self.softmax(x)
+		self.model = tf.keras.Model(inputs=inputs, outputs=actions)
+		self.model.compile(optimizer=tf.keras.optimizers.Adam(args.actor_learning_rate, global_clipnorm=args.clip_norm))
 
-	def train_iteration(self, x, advantage, actions, old_prob, p):
-		policy = self.forward(x)
-		probs = policy[torch.arange(policy.shape[0]), actions]
-		ignore_probs = self.ignore_dist[actions]
-		probs = (1 - p) * probs + p * ignore_probs
+	@tf.function
+	def train(self, x, advantage, actions, old_prob):
+		with tf.GradientTape() as tape:
+			prediction = self.model(x)
+			dist = tfp.distributions.Categorical(probs=prediction)
+			new_probs = dist.prob(actions)
 
-		old_prob = (1 - p) * old_prob + p * ignore_probs
-		ratio = probs / old_prob
+			ratio = new_probs / old_prob
 
-		clipped_advantage = torch.where(advantage > 0, (1 + self.eps) * advantage, (1 - self.eps) * advantage)
+			clipped_advantage = tf.where(
+				advantage > 0,
+				(1 + self.eps) * advantage,
+				(1 - self.eps) * advantage
+			)
 
-		loss = - torch.mean(torch.minimum(ratio * advantage, clipped_advantage))
+			policy_loss = - tf.reduce_mean(tf.minimum(ratio * advantage, clipped_advantage))
 
-		for var in self.parameters():
-			loss += self.l2 * torch.norm(var)
+			entropy_loss = - self.c_ent * tf.reduce_mean(dist.entropy())
 
-		self.optimizer.zero_grad()
-		loss.backward()
-		self.optimizer.step()
+			l2_loss = 0
+			for var in self.model.trainable_variables:
+				l2_loss += self.l2 * tf.nn.l2_loss(var)
+
+			loss = policy_loss + entropy_loss + l2_loss
+
+		self.model.optimizer.minimize(loss, self.model.trainable_variables, tape=tape)
+
+	@tf.function(experimental_relax_shapes=True)
+	def predict(self, x):
+		preds = self.model(x)
+		dist = tfp.distributions.Categorical(probs=preds)
+		actions = dist.sample()
+		return actions, dist.prob(actions)
 
 
-class Critic(torch.nn.Module):
+class Critic():
 	def __init__(self, args):
 		super(Critic, self).__init__()
 		self.l2 = args.l2
 
-		self.linear_1 = torch.nn.Linear(3, args.hidden_layer_critic)
-		self.relu1 = torch.nn.ReLU()
-		self.linear_2 = torch.nn.Linear(args.hidden_layer_critic, args.hidden_layer_critic)
-		self.relu2 = torch.nn.ReLU()
-		self.linear_3 = torch.nn.Linear(args.hidden_layer_critic, 1)
+		self.get_model(args)
 
-		self.optimizer = torch.optim.Adam(self.parameters(), lr=args.critic_learning_rate)
+	def get_model(self, args):
+		inputs = tf.keras.Input(shape=(3, )) # My position (0, 1), what I payed so far (0, 1) and how much time I spent in queue (0, 1)
 
-	def forward(self, x):
-		y = self.linear_1(x)
-		y = self.relu1(y)
-		y = self.linear_2(y)
-		y = self.relu2(y)
-		y = self.linear_3(y)
-		return y[:, 0]
+		z = tf.keras.layers.Dense(args.hidden_layer_critic, activation='relu')(inputs)
+		z = tf.keras.layers.Dense(args.hidden_layer_critic, activation='relu')(z)
+		value = tf.keras.layers.Dense(1, activation='linear')(z)[:, 0]
 
-	def train_iteration(self, x, y):
-		value = self.forward(x)
-		loss = torch.nn.MSELoss()(value, y)
-		for var in self.parameters():
-			loss += self.l2 * torch.norm(var)
+		self.model = tf.keras.Model(inputs=inputs, outputs=value)
+		self.model.compile(loss=tf.keras.losses.MeanSquaredError(),
+						   optimizer=tf.keras.optimizers.Adam(args.critic_learning_rate, global_clipnorm=args.clip_norm))
 
-		self.optimizer.zero_grad()
-		loss.backward()
-		self.optimizer.step()
+	@tf.function
+	def train(self, x, targets):
+		with tf.GradientTape() as tape:
+			prediction = self.model(x)
+			value_loss = self.model.compiled_loss(y_true=targets, y_pred=prediction)
+
+			l2_loss = 0
+			for var in self.model.trainable_variables:
+				l2_loss += self.l2 * tf.nn.l2_loss(var)
+
+			loss = value_loss + l2_loss
+
+		self.model.optimizer.minimize(loss, self.model.trainable_variables, tape=tape)
+
+	@tf.function(experimental_relax_shapes=True)
+	def predict(self, x):
+		return self.model(x)
 
 
 

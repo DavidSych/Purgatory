@@ -69,7 +69,7 @@ class Queue():
 		np.save(f'leaving_payment_{num}.npy', self.leaving_payment)
 		pickle.dump(self.args, open('args.pickle', 'wb'))
 
-	def step(self, actions):
+	def step(self, actions, probs=None):
 		'''
 		Main method of the game, accepting actions for each agent and simulating a game day.
 
@@ -86,12 +86,14 @@ class Queue():
 
 		# Take actions unless you forget
 		forgot_per_agent = np.random.uniform(0, 1, size=(len(self.agents, ))) <= np.array([a.p for a in self.agents])
-		for forgot, agent, action in zip(forgot_per_agent, self.agents, actions):
+		for i, (forgot, agent, action) in enumerate(zip(forgot_per_agent, self.agents, actions)):
 			if not forgot:
 				action = min(action, self.F - agent.payment)  # I will not overpay
 				agent.payment += action
 				agent.my_rewards[agent.t] = - action
 				agent.acting[agent.t] = 1
+				if probs is not None:
+					agent.probs[agent.t] = probs[i]
 			agent.t += 1
 
 		# Sort by current average payment

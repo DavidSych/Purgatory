@@ -18,6 +18,8 @@ class Agent:
 		self.acting = np.zeros((args.T, ), np.int)
 		# Storing agent's rewards and costs
 		self.my_rewards = np.zeros(args.T)
+		# Probabilities of actions
+		self.probs = np.zeros(args.T)
 
 	@property
 	def average_payment(self):
@@ -27,5 +29,6 @@ class Agent:
 		self.my_states = self.my_states[:self.t]
 		self.my_rewards = self.my_rewards[:self.t]
 		self.acting = self.acting[:self.t]
+		self.probs = self.probs[:self.t]
 
 

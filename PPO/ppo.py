@@ -20,7 +20,7 @@ parser.add_argument("--entropy_weight", default=1e-2, type=float, help="Entropy 
 parser.add_argument("--l2", default=1e-2, type=float, help="L2 regularization constant.")
 parser.add_argument("--clip_norm", default=0.1, type=float, help="Gradient clip norm.")
 
-parser.add_argument("--buffer_len", default=10_000, type=int, help="Number of time steps to train on.")
+parser.add_argument("--buffer_len", default=20_000, type=int, help="Number of time steps to train on.")
 parser.add_argument("--epsilon", default=0.05, type=float, help="Clipping constant.")
 parser.add_argument("--gamma", default=1, type=float, help="Return discounting.")
 parser.add_argument("--_lambda", default=0.97, type=float, help="Advantage discounting.")
@@ -29,7 +29,7 @@ parser.add_argument("--train_sims", default=257, type=int, help="How many simula
 parser.add_argument("--evaluate", default=False, type=bool, help="If NashConv should be computed as well.")
 
 # Queue parameters
-parser.add_argument("--F", default=3, type=int, help="Amount to pay to leave queue.")
+parser.add_argument("--F", default=4, type=int, help="Amount to pay to leave queue.")
 parser.add_argument("--Q", default=4, type=int, help="End fine to pay.")
 parser.add_argument("--T", default=4, type=int, help="Time to survive in queue.")
 parser.add_argument("--k", default=5, type=int, help="How many people have to pay in each step.")
@@ -61,17 +61,15 @@ shutil.copy(path + '/ppo.py', parent + '/Results/PPO/' + dir_name)
 
 
 def train(buffer):
-	states = torch.tensor(buffer[:, :3].astype(np.float32))
-	actions = torch.tensor(buffer[:, 3].astype(np.int64))
-	policy = actor(states).detach()
-	old_probs = policy[torch.arange(states.shape[0]), actions]
-	returns = torch.tensor(buffer[:, 3].astype(np.float32))
-	advantage = torch.tensor(buffer[:, 4].astype(np.float32))
-	prob_ignorance = torch.tensor(buffer[:, 5].astype(np.float32))
+	states = buffer[:, :3]
+	actions = buffer[:, 3]
+	advantage = buffer[:, 4]
+	returns = buffer[:, 5]
+	old_probs = buffer[:, 6]
 
 	for _ in range(args.train_cycles):
-		critic.train_iteration(states, returns)
-		actor.train_iteration(states, advantage, actions, old_probs, prob_ignorance)
+		critic.train(states, returns)
+		actor.train(states, advantage, actions, old_probs)
 
 
 def preprocess(state):
@@ -88,25 +86,23 @@ critic = Critic(args)
 for i in range(args.train_sims):
 	queue = Queue(args)
 	state = queue.initialize()
-	# (0-2) state, (3) action, (4) returns, (5) advantage and (6) ignorance
+	# (0-2) state, (3) action, (4) returns, (5) advantage and (6) probs of actions
 	buffer = np.zeros(shape=(args.buffer_len, 7), dtype=np.float32)
 	pointer = 0  # Where to write in the buffer
 
 	# War up to the equilibrium length
 	for _ in range(args.tau):
 		state = preprocess(state)
-		policy = actor(torch.tensor(state)).detach().numpy()
-		actions = np.apply_along_axis(lambda p: random.choices(np.arange(args.F+1), weights=p), arr=policy, axis=1)
+		actions, probs = actor.predict(state)
 
-		state, removed = queue.step(actions)
+		state, removed = queue.step(actions.numpy(), probs.numpy())
 
 	# Gather data and perform training
 	while pointer < args.buffer_len:
 		state = preprocess(state)
-		policy = actor(torch.tensor(state)).detach().numpy()
-		actions = np.apply_along_axis(lambda p: random.choices(np.arange(args.F+1), weights=p), arr=policy, axis=1)
+		actions, probs = actor.predict(state)
 
-		state, removed = queue.step(actions)
+		state, removed = queue.step(actions.numpy(), probs.numpy())
 		for r in removed:
 			t_steps = np.arange(r.t)
 			is_acting = np.where(r.acting > 0)
@@ -116,25 +112,25 @@ for i in range(args.train_sims):
 			returns = rewards * (args.gamma ** t_steps)
 			returns = np.cumsum(returns[::-1])[::-1] / (args.gamma ** t_steps)
 
-			values = critic(torch.tensor(r_states)).detach().numpy()
+			values = critic.predict(r_states).numpy()
 			values = np.append(values, 0)
 			td_error = rewards + args.gamma * values[1:] - values[:-1]
 			decay_factor = args.gamma * args._lambda
 			adv = td_error * (decay_factor ** t_steps)
 			adv = np.cumsum(adv[::-1])[::-1] / (decay_factor ** t_steps)
 
-			to_add = min(r.t, args.buffer_len - pointer)
+			to_add = min(np.sum(r.acting), args.buffer_len - pointer)
 
-			buffer[pointer:pointer+to_add, :3] = r_states[:to_add]
-			buffer[pointer:pointer+to_add, 3] = r_actions[:to_add]
-			buffer[pointer:pointer+to_add, 4] = returns[:to_add]
-			buffer[pointer:pointer+to_add, 5] = adv[:to_add]
-			buffer[pointer:pointer+to_add, 6] = r.p * np.ones(to_add)
+			buffer[pointer:pointer+to_add, :3] = r_states[is_acting][:to_add]
+			buffer[pointer:pointer+to_add, 3] = r_actions[is_acting][:to_add]
+			buffer[pointer:pointer+to_add, 4] = returns[is_acting][:to_add]
+			buffer[pointer:pointer+to_add, 5] = adv[is_acting][:to_add]
+			buffer[pointer:pointer+to_add, 6] = r.probs[is_acting][:to_add]
 
 			pointer += to_add
 
 	all_states = np.mgrid[0:1:1 / queue.F, 0:1:1 / queue.T, 0:1:1 / queue.N_equal].transpose((1, 2, 3, 0)).reshape(-1, 3)
-	policy = actor(torch.tensor(all_states.astype(np.float32))).detach().numpy()
+	policy = actor.model(all_states).numpy()
 
 	train(buffer)
 
