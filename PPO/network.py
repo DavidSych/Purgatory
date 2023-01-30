@@ -9,6 +9,10 @@ class Actor(torch.nn.Module):
 		self.l2 = args.l2
 		self.c_entropy = args.entropy_weight
 
+		ignorance_dist = torch.zeros(args.F + 1)
+		ignorance_dist[0] = 1
+		self.ign_dist = ignorance_dist
+
 		self.linear_1 = torch.nn.Linear(3, args.hidden_layer_actor)
 		self.relu = torch.nn.ReLU()
 		self.linear_2 = torch.nn.Linear(args.hidden_layer_actor, args.F+1)
@@ -22,13 +26,9 @@ class Actor(torch.nn.Module):
 		x = self.linear_2(x)
 		return self.softmax(x)
 
-	def train_iteration(self, x, advantage, actions, old_prob):
-		policy = self.forward(x)
-		print(policy.detach().numpy())
-		print(policy.shape)
-		print(actions)
+	def train_iteration(self, x, advantage, actions, old_prob, p):
+		policy = (1 - p)[:, None] * self.forward(x) + p[:, None] * self.ign_dist
 		probs = policy[torch.arange(policy.shape[0]), actions]
-		print(probs)
 
 		ratio = probs / old_prob
 
@@ -76,11 +76,3 @@ class Critic(torch.nn.Module):
 		self.optimizer.zero_grad()
 		loss.backward()
 		self.optimizer.step()
-
-
-
-
-
-
-
-

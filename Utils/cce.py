@@ -20,7 +20,7 @@ def sample_expectation(queue, steps, policy):
 
 		for r in removed:
 			returns = np.sum(r.my_rewards)
-			s = r.my_states
+			s = r.my_states[:, :3]
 			a = np.mod(-r.my_rewards, queue.Q).astype(np.int64)
 			return_sum[s[:, 0], s[:, 1], s[:, 2], a] += returns
 			visit_count[s[:, 0], s[:, 1], s[:, 2], a] += 1
@@ -54,9 +54,9 @@ def load_old(sim, return_sum, visit_count):
 
 
 algorithm = 'PPO'
-folder = '2022-10-19_21-32'
-steps = 2000  # Steps in the queue to approximate everything with
-sim_skip = 16  # Evaluate only every _ simulation
+folder = '2022-10-20_22-13'
+steps = 1000  # Steps in the queue to approximate everything with
+sim_skip = 8  # Evaluate only every _ simulation
 
 
 os.chdir(f'../Results/{algorithm}/{folder}')

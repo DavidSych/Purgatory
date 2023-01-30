@@ -53,13 +53,13 @@ def draw_leaving_counts(algorithm, folder):
 		axs[0].bar(np.arange(args.T) + 1, leaving_time / np.sum(leaving_time), align='center')
 		axs[0].set_xlabel('Time')
 		axs[0].set_ylabel('Percentage')
-		axs[1].bar(np.arange(args.Q + args.F - 1), leaving_payment / np.sum(leaving_payment), align='center')
+		axs[1].bar(np.arange(args.Q + args.F), leaving_payment / np.sum(leaving_payment), align='center')
 		axs[1].set_xlabel('Payment')
 		axs[1].set_ylabel('Percentage')
 		plt.savefig(os.pardir + f'/figures/counts/counts_{num}.pdf')
 		plt.clf()
 
-		average_payment = np.sum(np.arange(args.Q + args.F - 1) * leaving_payment / np.sum(leaving_payment))
+		average_payment = np.sum(np.arange(args.Q + args.F) * leaving_payment / np.sum(leaving_payment))
 		min_payment = args.Q * args.k / args.x_mean
 		payment = average_payment - min_payment
 		print(f'Average payment above minimum: {np.round(payment, 2):.2f}, {np.round(100 * payment / args.F, 1):.1f}% of F.')
@@ -68,7 +68,7 @@ def draw_leaving_counts(algorithm, folder):
 
 
 algorithm = 'PPO'
-folder = '2022-10-19_21-32'
+folder = '2023-01-30_19-55'
 prepare_folders(algorithm, folder)
 draw_final_policy(algorithm, folder)
 draw_leaving_counts(algorithm, folder)

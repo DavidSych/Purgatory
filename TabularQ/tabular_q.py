@@ -11,16 +11,16 @@ parser.add_argument("--learning_rate", default=5e-2, type=float, help="Learning 
 parser.add_argument("--gamma", default=1, type=float, help="Return discounting.")
 parser.add_argument("--epsilon", default=0.05, type=float, help="Exploration rate.")
 parser.add_argument("--train_steps", default=1_000, type=int, help="How many simulations to train from.")
-parser.add_argument("--train_sims", default=32, type=int, help="How many times to save progress.")
+parser.add_argument("--train_sims", default=256, type=int, help="How many times to save progress.")
 
 # Queue parameters
-parser.add_argument("--F", default=2, type=int, help="End fine to pay.")
-parser.add_argument("--Q", default=4, type=int, help="End fine to pay.")
+parser.add_argument("--F", default=4, type=int, help="End fine to pay.")
+parser.add_argument("--Q", default=40, type=int, help="End fine to pay.")
 parser.add_argument("--T", default=4, type=int, help="Time to survive in queue.")
 parser.add_argument("--k", default=5, type=int, help="How many people have to pay in each step.")
 parser.add_argument("--x_mean", default=100, type=float, help="Mean number of agents to add each step.")
 parser.add_argument("--x_std", default=5, type=float, help="Standard deviation of the number of agents to add each step.")
-parser.add_argument("--ignorance_distribution", default='uniform', type=str, help="What distribuin to use to sample probability of ignorance. Supported: fixed, uniform, beta.")
+parser.add_argument("--ignorance_distribution", default='fixed', type=str, help="What distribuin to use to sample probability of ignorance. Supported: fixed, uniform, beta.")
 parser.add_argument("--p", default=0.5, type=float, help="Fixed probability of ignorance")
 parser.add_argument("--p_min", default=0.5, type=float, help="Parameter of uniform distribution of ignorance.")
 parser.add_argument("--alpha", default=2, type=float, help="Parameter of Beta distribution of ignorance.")
@@ -64,7 +64,8 @@ def train(q_table, removed):
 			s = r.my_states[t]
 			reward = r.my_rewards[t]
 			next_s = r.my_states[t + 1]
-			next_q = np.max(q_table[next_s[0], next_s[1], next_s[2], :])
+			next_q = (1 - r.p) * np.max(q_table[next_s[0], next_s[1], next_s[2], :])
+			next_q += r.p * q_table[next_s[0], next_s[1], next_s[2], 0]  # If I forget, I play nothing
 			current_q = q_table[s[0], s[1], s[2]].copy()
 
 			target = (1 - args.learning_rate) * current_q
@@ -75,7 +76,7 @@ def train(q_table, removed):
 		reward = r.my_rewards[r.t-1]
 		current_q = q_table[s[0], s[1], s[2]].copy()
 
-		target = (1 - args.learning_rate) * current_q + reward
+		target = (1 - args.learning_rate) * current_q + reward * args.gamma
 		q_table[s[0], s[1], s[2]] = target
 
 	return q_table
@@ -92,6 +93,8 @@ for i in range(args.train_sims):
 	greedy = np.argmax(q_table.reshape((-1, args.F+1)), axis=-1)
 	policy[np.arange(policy.shape[0]), greedy] = 1 - args.epsilon
 	policy[:, :] += args.epsilon / (args.F + 1)
+
+	print(np.mean(policy, axis=0))
 	policy = policy.reshape((args.F, args.T, queue.N_equal, args.F+1))
 
 	policy_saver(policy, i)

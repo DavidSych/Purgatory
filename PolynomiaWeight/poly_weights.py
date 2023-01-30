@@ -14,13 +14,13 @@ parser.add_argument("--learning_rate", default=1e-1, type=float, help="Learning 
 parser.add_argument("--min_visit_count", default=1, type=int, help="Minimum number of visits to consider estimated cost during policy update")
 
 parser.add_argument("--train_steps", default=1_000, type=int, help="How many simulations to train for.")
-parser.add_argument("--train_sims", default=1024, type=int, help="How many times to save progress.")
+parser.add_argument("--train_sims", default=65, type=int, help="How many times to save progress.")
 
 # Queue parameters
 parser.add_argument("--F", default=4, type=int, help="End fine to pay.")
 parser.add_argument("--Q", default=4, type=int, help="End fine to pay.")
-parser.add_argument("--T", default=4, type=int, help="Time to survive in queue.")
-parser.add_argument("--k", default=5, type=int, help="How many people have to pay in each step.")
+parser.add_argument("--T", default=1, type=int, help="Time to survive in queue.")
+parser.add_argument("--k", default=0, type=int, help="How many people have to pay in each step.")
 parser.add_argument("--x_mean", default=100, type=float, help="Mean number of agents to add each step.")
 parser.add_argument("--x_std", default=5, type=float, help="Standard deviation of the number of agents to add each step.")
 parser.add_argument("--ignorance_distribution", default='uniform', type=str, help="What distribuin to use to sample probability of ignorance.")
