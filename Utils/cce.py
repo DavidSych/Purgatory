@@ -94,11 +94,11 @@ for sim in range(len(os.listdir(os.getcwd() + '/policies')) // sim_skip):
 	for i, c in enumerate(cutoffs):
 		low_visit_count = np.where(counts < c)
 		regrets[low_visit_count] = 0
-		cut_regrets[sim, i] = np.max(regrets)
+		cut_regrets[sim, i] = np.sum(np.max(regrets, axis=-1))
 
 	plt.plot(cutoffs, cut_regrets[sim], c=cmap(sim * sim_skip / args.train_sims))
 
-plt.ylabel('Max Regret ($\epsilon$)')
+plt.ylabel('Regret ($\epsilon$)')
 plt.xlabel('Minimum count')
 if cut_regrets[0, -1] > 0:
 	plt.ylim((0, 1.5 * cut_regrets[0, -1]))
