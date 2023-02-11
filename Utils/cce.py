@@ -54,9 +54,9 @@ def load_old(sim, return_sum, visit_count):
 
 
 algorithm = 'PPO'
-folder = '2022-10-20_22-13'
-steps = 1000  # Steps in the queue to approximate everything with
-sim_skip = 8  # Evaluate only every _ simulation
+folder = '2023-01-30_20-46'
+steps = 10_000  # Steps in the queue to approximate everything with
+sim_skip = 64  # Evaluate only every _ simulation
 
 
 os.chdir(f'../Results/{algorithm}/{folder}')
@@ -107,6 +107,8 @@ cbar.set_ticks(np.arange(8) / 7)
 cbar.set_ticklabels(np.arange(0, args.train_sims, (args.train_sims - 1) / 7).astype(np.int32) + 1)
 plt.savefig(os.getcwd() + '/figures/regrets.pdf')
 
+if cut_regrets[0, -1] > 0:
+	plt.ylim((0.9 * np.min(cut_regrets), 1.1 * cut_regrets[0, -1]))
 plt.yscale('log')
 plt.savefig(os.getcwd() + '/figures/regrets_log.pdf')
 plt.clf()
