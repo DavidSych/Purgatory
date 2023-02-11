@@ -26,7 +26,7 @@ def draw_final_policy(algorithm, folder):
 		avr_percentage = np.round(100 * avr_policy, decimals=1)
 		x = np.arange(avr_policy.shape[0])
 		plt.grid(0.25)
-		for action in range(1, args.F + 1):
+		for action in range(args.F + 1):
 			plt.plot(x, avr_percentage[:, action], label=f'Pay {action}')
 
 		plt.xlabel(feature)
@@ -44,7 +44,7 @@ def draw_leaving_counts(algorithm, folder):
 	root = os.getcwd()
 	os.chdir(f'../Results/{algorithm}/{folder}/queue_data')
 	args = pickle.load(open('args.pickle', 'rb'))
-	for num in range(len(os.listdir(os.getcwd())) // 2):
+	for num in range(len(os.listdir(os.getcwd())) // 3):
 		leaving_time = np.load(f'leaving_time_{num}.npy')
 		leaving_payment = np.load(f'leaving_payment_{num}.npy')
 
@@ -68,10 +68,10 @@ def draw_leaving_counts(algorithm, folder):
 
 
 algorithm = 'PPO'
-folder = '2023-01-30_19-55'
+folder = '2023-02-08_08-56'
 prepare_folders(algorithm, folder)
 draw_final_policy(algorithm, folder)
-draw_leaving_counts(algorithm, folder)
+#draw_leaving_counts(algorithm, folder)
 
 
 

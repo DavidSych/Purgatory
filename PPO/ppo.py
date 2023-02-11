@@ -16,30 +16,30 @@ parser.add_argument("--hidden_layer_actor", default=4, type=int, help="Size of t
 parser.add_argument("--hidden_layer_critic", default=32, type=int, help="Size of the hidden layer of the network.")
 parser.add_argument("--actor_learning_rate", default=3e-4, type=float, help="Learning rate.")
 parser.add_argument("--critic_learning_rate", default=1e-3, type=float, help="Learning rate.")
-parser.add_argument("--entropy_weight", default=1e-3, type=float, help="Entropy regularization constant.")
+parser.add_argument("--entropy_weight", default=0, type=float, help="Entropy regularization constant.")
 parser.add_argument("--l2", default=0, type=float, help="L2 regularization constant.")
 parser.add_argument("--clip_norm", default=0.1, type=float, help="Gradient clip norm.")
 
-parser.add_argument("--buffer_len", default=1_000, type=int, help="Number of time steps to train on.")
+parser.add_argument("--buffer_len", default=10_000, type=int, help="Number of time steps to train on.")
 parser.add_argument("--epsilon", default=0.05, type=float, help="Clipping constant.")
 parser.add_argument("--gamma", default=1., type=float, help="Return discounting.")
 parser.add_argument("--_lambda", default=0.97, type=float, help="Advantage discounting.")
-parser.add_argument("--train_cycles", default=16, type=int, help="Number of PPO passes.")
+parser.add_argument("--train_cycles", default=32, type=int, help="Number of PPO passes.")
 parser.add_argument("--train_sims", default=1024, type=int, help="How many simulations to train from.")
 parser.add_argument("--evaluate", default=False, type=bool, help="If NashConv should be computed as well.")
 
 # Queue parameters
-parser.add_argument("--F", default=3, type=int, help="Amount to pay to leave queue.")
-parser.add_argument("--Q", default=5, type=int, help="End fine to pay.")
-parser.add_argument("--T", default=1, type=int, help="Time to survive in queue.")
-parser.add_argument("--k", default=5, type=int, help="How many people have to pay in each step.")
+parser.add_argument("--F", default=4, type=int, help="Amount to pay to leave queue.")
+parser.add_argument("--Q", default=6, type=int, help="End fine to pay.")
+parser.add_argument("--T", default=4, type=int, help="Time to survive in queue.")
+parser.add_argument("--k", default=2, type=int, help="How many people have to pay in each step.")
 parser.add_argument("--g", default=1, type=int, help="How many groups to use.")
 parser.add_argument("--tau", default=1, type=int, help="Don't use agents added to queue before tau * T steps.")
-parser.add_argument("--x_mean", default=20, type=float, help="Mean number of agents to add each step.")
-parser.add_argument("--x_std", default=2, type=float, help="Standard deviation of the number of agents to add each step.")
+parser.add_argument("--x_mean", default=100, type=float, help="Mean number of agents to add each step.")
+parser.add_argument("--x_std", default=0, type=float, help="Standard deviation of the number of agents to add each step.")
 parser.add_argument("--N_init", default=20, type=int, help="Initial number of agents.")
 parser.add_argument("--ignorance_distribution", default='fixed', type=str, help="What distribuin to use to sample probability of ignorance. Supported: fixed, uniform, beta.")
-parser.add_argument("--p", default=0.0, type=float, help="Fixed probability of ignorance")
+parser.add_argument("--p", default=0.5, type=float, help="Fixed probability of ignorance")
 parser.add_argument("--p_min", default=0.0, type=float, help="Parameter of uniform distribution of ignorance.")
 parser.add_argument("--alpha", default=2, type=float, help="Parameter of Beta distribution of ignorance.")
 parser.add_argument("--beta", default=4, type=float, help="Parameter of Beta distribution of ignorance.")
@@ -81,8 +81,6 @@ def preprocess(state):
 	state[:, 1] = state[:, 1] / args.T
 	state[:, 2] = state[:, 2] / ((args.x_mean - args.k) * args.T)
 	return state
-
-policies = np.empty(shape=(args.train_sims, args.F+1))
 
 actor = Actor(args)
 critic = Critic(args)
@@ -135,12 +133,8 @@ for i in range(args.train_sims):
 
 			pointer += to_add
 
-	all_states = np.mgrid[0:1:1 / queue.F, 0:1:1 / queue.T, 0:1:1 / queue.N_equal].transpose((1, 2, 3, 0)).reshape(-1, 3)
+	all_states = preprocess(np.mgrid[0:queue.F:1, 0:queue.T:1, 0:queue.N_equal:1]).transpose((1, 2, 3, 0)).reshape(-1, 3)
 	policy = actor(torch.tensor(all_states.astype(np.float32))).detach().numpy()
-	# DEBUG
-	print(np.mean(policy, axis=0))
-	print(np.std(policy, axis=0))
-	policies[i, :] = np.mean(policy, axis=0)
 
 	train(buffer, actor, critic)
 
@@ -149,16 +143,6 @@ for i in range(args.train_sims):
 	print(f'Saving progress ({i+1}/{args.train_sims}).')
 
 
-import matplotlib.pyplot as plt
-
-for a in range(args.F+1):
-	plt.plot(np.arange(args.train_sims), policies[:, a], label=f'Action {a}')
-
-plt.xlabel('Train Iteration')
-plt.ylabel('Probability')
-plt.ylim((0, 1))
-plt.legend()
-plt.savefig('policy_evolution.pdf')
 
 
 
