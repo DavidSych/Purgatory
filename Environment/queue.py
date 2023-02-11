@@ -11,6 +11,7 @@ class Queue():
 		self.F = args.F
 		self.Q = args.Q
 		self.T = args.T
+		self.tau = args.tau
 		self.x_mean, self.x_std = args.x_mean, args.x_std
 		self.args = args
 		self.N_equal = (args.x_mean - args.k) * args.T
@@ -19,6 +20,7 @@ class Queue():
 
 		self.leaving_time = np.zeros(shape=(args.T, ), dtype=np.int)
 		self.leaving_payment = np.zeros(shape=(args.Q + args.F, ), dtype=np.int)
+		self.info = {}
 
 	def initialize(self):
 		self.agents = [Agent(self.args) for _ in range(self.x_mean)]
@@ -63,8 +65,9 @@ class Queue():
 
 		for r in removed:
 			r.terminate()
-			self.leaving_payment[r.payment] += 1
-			self.leaving_time[r.t-1] += 1
+			if self.step_num > self.tau * self.T:
+				self.leaving_payment[r.payment] += 1
+				self.leaving_time[r.t-1] += 1
 
 		return removed
 
@@ -75,7 +78,8 @@ class Queue():
 	def save(self, num):
 		np.save(f'leaving_time_{num}.npy', self.leaving_time)
 		np.save(f'leaving_payment_{num}.npy', self.leaving_payment)
-		pickle.dump(self.args, open('args.pickle', 'wb'))
+		self.info['w'] = self.step_num
+		pickle.dump(self.info, open(f'info_{num}.pickle', 'wb'))
 
 	def step(self, actions):
 		'''
