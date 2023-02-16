@@ -1,7 +1,7 @@
 import os
 import pickle
 import numpy as np
-from Simulations.Environment.agent import Agent
+from Environment.agent import Agent
 import copy, random
 
 
@@ -12,33 +12,35 @@ class Queue():
 		self.Q = args.Q
 		self.T = args.T
 		self.tau = args.tau
+		self.g = len(args.g_prob)
+		self.g_prob = np.array(args.g_prob)
 		self.x_mean, self.x_std = args.x_mean, args.x_std
 		self.args = args
 		self.N_equal = (args.x_mean - args.k) * args.T
 
 		self.step_num = 0
 
-		self.leaving_time = np.zeros(shape=(args.T, ), dtype=np.int)
-		self.leaving_payment = np.zeros(shape=(args.Q + args.F, ), dtype=np.int)
+		self.leaving_time = np.zeros(shape=(self.g, args.T, ), dtype=np.int)
+		self.leaving_payment = np.zeros(shape=(self.g, args.Q + args.F, ), dtype=np.int)
 		self.info = {}
 
 	def initialize(self):
-		self.agents = [Agent(self.args) for _ in range(self.x_mean)]
+		self.agents = [Agent(self.args, g) for g in random.choices(np.arange(self.g), weights=self.g_prob, k=self.x_mean)]
 		return self.state()
 
 	def state(self):
-		state = np.empty(shape=(self.num_agents, 3), dtype=int)
+		state = np.empty(shape=(self.num_agents, 4), dtype=int)
 		for position, agent in enumerate(self.agents):
-			s = (agent.payment, agent.t-1, min(position, self.N_equal - 1))
+			s = (agent.payment, agent.t-1, min(position, self.N_equal - 1), agent.group)
 			state[position, :] = s
-			agent.my_states[agent.t-1, :] = s
+			agent.my_states[agent.t-1, :] = s[:3]
 
 		return state
 
 	def add_agents(self):
 		to_add = int(np.random.normal(loc=self.x_mean, scale=self.x_std))
-		for _ in range(to_add):
-			new_agent = Agent(self.args)
+		for g in random.choices(np.arange(self.g), weights=self.g_prob, k=to_add):
+			new_agent = Agent(self.args, g)
 			self.agents.append(new_agent)
 
 	def remove_agents(self):
@@ -66,8 +68,8 @@ class Queue():
 		for r in removed:
 			r.terminate()
 			if self.step_num > self.tau * self.T:
-				self.leaving_payment[r.payment] += 1
-				self.leaving_time[r.t-1] += 1
+				self.leaving_payment[r.group, r.payment] += 1
+				self.leaving_time[r.group, r.t-1] += 1
 
 		return removed
 

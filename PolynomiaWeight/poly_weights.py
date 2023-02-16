@@ -1,11 +1,11 @@
 import os
 
 import numpy as np
-from Simulations.Environment.queue import Queue
+from Environment.queue import Queue
 import argparse
 import random, datetime
 import pickle, shutil, time
-from Simulations.Utils.misc import queue_saver, policy_saver
+from Utils.misc import queue_saver, policy_saver
 
 parser = argparse.ArgumentParser()
 # TF params

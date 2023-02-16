@@ -1,8 +1,9 @@
 import numpy as np
 
 class Agent:
-	def __init__(self, args):
-		self.t, self.payment = 0, 0
+	def __init__(self, args, group_num):
+		self.t, self.payment, self.group = 0, 0, group_num
+		self.strategy, self.T = 0, args.T
 		if args.ignorance_distribution == 'fixed':
 			self.p = args.p
 		elif args.ignorance_distribution == 'uniform':
@@ -12,7 +13,7 @@ class Agent:
 		else:
 			raise NotImplementedError(f'Unknown ignorance distribution {args.ignorance_distribution}.')
 
-		# Storing agent's trajectory, (0) running payment, (1) my t, (2) my position
+		# Storing agent's trajectory, (0) running payment, (1) my t, (2) my position, (3) group
 		self.my_states = np.zeros((args.T, 3), dtype=np.int)
 		# If agent was allowed to act or not
 		self.acting = np.zeros((args.T, ), dtype=np.int)
@@ -24,6 +25,13 @@ class Agent:
 	@property
 	def average_payment(self):
 		return self.payment / self.t
+
+	@property
+	def in_danger(self):
+		if self.t > 1:
+			return (self.my_states[self.t-1, 2] - self.my_states[self.t, 2]) * (self.T - self.t) < 0
+		else:
+			return False
 
 	def terminate(self):
 		self.my_states = self.my_states[:self.t]

@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle, os
-from Simulations.Utils.misc import my_chdir
+from Utils.misc import my_chdir
 
 
 def prepare_folders(algorithm, folders):

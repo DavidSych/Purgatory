@@ -18,6 +18,8 @@ def queue_saver(queue, num):
 def policy_saver(policy, num):
 	root = os.getcwd()
 	my_chdir('policies')
-	np.save(f'policy_{num}.npy', policy)
+	np.save(f'policy_{num}', policy)
 	os.chdir(root)
+
+
 

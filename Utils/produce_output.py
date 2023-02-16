@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle, os
-from Simulations.Utils.misc import my_chdir
+from Utils.misc import my_chdir
 
 
 def prepare_folders(algorithm, folder):
@@ -68,7 +68,7 @@ def draw_leaving_counts(algorithm, folder):
 
 
 algorithm = 'PPO'
-folder = '2023-02-08_08-56'
+folder = '2023-02-12_22-04'
 prepare_folders(algorithm, folder)
 draw_final_policy(algorithm, folder)
 #draw_leaving_counts(algorithm, folder)
