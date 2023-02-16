@@ -4,6 +4,7 @@ import numpy as np
 class BRSAgent:
 	def __init__(self, args):
 		self.utilities = []
+		self.F = args.F
 		self.utility_samples = args.buffer_len
 
 	@property
@@ -12,8 +13,10 @@ class BRSAgent:
 
 	def actions(self, agents):
 		for agent in agents:
-			if agent.in_danger:
+			if agent.in_danger and agent.strategy < self.F:
 				agent.strategy += 1
+			elif agent.strategy > 0:
+				agent.strategy -= 1
 		actions = np.array([agent.strategy for agent in agents])
 		return actions
 

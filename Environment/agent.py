@@ -29,7 +29,8 @@ class Agent:
 	@property
 	def in_danger(self):
 		if self.t > 1:
-			return (self.my_states[self.t-1, 2] - self.my_states[self.t, 2]) * (self.T - self.t) < 0
+			n_curr, n_prev = self.my_states[self.t, 2], self.my_states[self.t-1, 2]
+			return (n_prev - n_curr) * (self.T - self.t) > n_curr
 		else:
 			return False
 
