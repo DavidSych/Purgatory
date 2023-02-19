@@ -8,12 +8,13 @@ from BRS.brs import BRSAgent
 from Utils.tabular import TabularAgent
 from Utils.misc import *
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 parser = argparse.ArgumentParser()
 # TF params
-parser.add_argument("--seed", default=42, type=int, help="Random seed for reproducibility.")
+parser.add_argument("--seed", default=1, type=int, help="Random seed for reproducibility.")
 parser.add_argument("--threads", default=15, type=int, help="Number of CPU threads to use.")
 parser.add_argument("--hidden_layer_actor", default=4, type=int, help="Size of the hidden layer of the network.")
 parser.add_argument("--hidden_layer_critic", default=32, type=int, help="Size of the hidden layer of the network.")
@@ -36,12 +37,12 @@ parser.add_argument("--F", default=4, type=int, help="Amount to pay to leave que
 parser.add_argument("--Q", default=6, type=int, help="End fine to pay.")
 parser.add_argument("--T", default=4, type=int, help="Time to survive in queue.")
 parser.add_argument("--k", default=2, type=int, help="How many people have to pay in each step.")
-parser.add_argument("--algorithms", default=['ppo1', 'brs1'], type=list[str], help="List of algorithms to use, len(algorithms) = g, each unique entry is a separate instance. See `algorithm_initializer` for syntax.")
-parser.add_argument("--g_prob", default=[0.1, 0.9], type=list[float], help="List of percentages representing probability each agents belongs to a given group.")
+parser.add_argument("--algorithms", default=['BRS'], type=list[str], help="List of algorithms to use, len(algorithms) = g, each unique entry is a separate instance. See `algorithm_initializer` for syntax.")
+parser.add_argument("--g_prob", default=[1.0], type=list[float], help="List of percentages representing probability each agents belongs to a given group.")
 parser.add_argument("--tau", default=2, type=int, help="Don't use agents added to queue before tau * T steps.")
-parser.add_argument("--x_mean", default=20, type=float, help="Mean number of agents to add each step.")
+parser.add_argument("--x_mean", default=32, type=float, help="Mean number of agents to add each step.")
 parser.add_argument("--x_std", default=0, type=float, help="Standard deviation of the number of agents to add each step.")
-parser.add_argument("--N_init", default=20, type=int, help="Initial number of agents.")
+parser.add_argument("--N_init", default=32, type=int, help="Initial number of agents.")
 parser.add_argument("--ignorance_distribution", default='fixed', type=str, help="What distribuin to use to sample probability of ignorance. Supported: fixed, uniform, beta.")
 parser.add_argument("--p", default=0.5, type=float, help="Fixed probability of ignorance")
 parser.add_argument("--p_min", default=0.0, type=float, help="Parameter of uniform distribution of ignorance.")
@@ -52,14 +53,25 @@ parser.add_argument("--reward_shaping", default=False, type=bool, help="If rewar
 args = parser.parse_args([] if "__file__" not in globals() else None)
 
 args.g = len(args.g_prob)
+if args.algorithms == ['BRS']:
+	args.train_sims = 1
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 
+mpl.rcParams.update({
+   'axes.labelsize': 10,
+   'font.size': 10,
+   'legend.fontsize': 10,
+   'xtick.labelsize': 8,
+   'ytick.labelsize': 8,
+   'figure.figsize': [5.5, 4.5]
+})
+
 
 def algorithm_initializer(alg_name, args):
-	if alg_name[:3] == 'ppo':
+	if alg_name[:3] == 'PPO':
 		return PPOLearner(args)
-	elif alg_name[:3] == 'brs':
+	elif alg_name[:3] == 'BRS':
 		return BRSAgent(args)
 	else:
 		raise NotImplementedError(f'Unknown algorithm name {alg_name}.')
@@ -80,7 +92,7 @@ class GroupRunner:
 	def prepare_results_dir(self):
 		self.results_path = os.getcwd()
 		os.chdir(f'../Results/Group')
-		dir_name = f'{str(datetime.datetime.now().date())}_{str(datetime.datetime.now().time())[:5].replace(":", "-")}'
+		dir_name = '_'+'-'.join(args.algorithms)+'_'+'-'.join([str(pr) for pr in args.g_prob])+'_F'+str(args.F)+'_Q'+str(args.Q)+'_T'+str(args.T)+'_k'+str(args.k)+'_x'+str(args.x_mean)+'_p'+str(args.p)[:6]+'_s'+str(args.seed)
 		os.mkdir(dir_name)
 		os.chdir(dir_name)
 		pickle.dump(args, open("args.pickle", "wb"))
@@ -97,7 +109,7 @@ class GroupRunner:
 					continue
 
 				group_states = state[group_ids, :3]
-				if self.args.algorithms[g][:3] == 'brs':
+				if self.args.algorithms[g][:3] == 'BRS':
 					group_actions = learner.actions([self.queue.agents[i] for i in group_ids[0]])
 				else:
 					group_actions = learner.actions(group_states[0])[:, 0]
@@ -171,21 +183,22 @@ class GroupRunner:
 		nashconv = best_response_utility - on_policy_utility
 		np.savetxt('nashconv.npy', nashconv)
 
-	def plot_nash_conv(self, folder):
+	def plot_nash_conv(self, folder, br_frac):
 		os.chdir(f'../Results/Group/{folder}')
 		nashconv = np.loadtxt('nashconv.npy')[None, :]
+		iteration = np.arange(nashconv.shape[-1]) + 1
 		args = pickle.load(open("args.pickle", "rb"))
 		plt.grid(0.25)
 		for i, alg in enumerate(args.algorithms):
-			plt.plot(nashconv[i, :], label=f'Algorithm: {alg}', alpha=0.25, c='royalblue')
+			plt.plot(iteration, nashconv[i, :], label=f'NashConv', alpha=0.25, c='royalblue')
 			smooth_nashconv = np.convolve(nashconv[i, :], np.ones(7) / 7, mode='same')
-			plt.plot(smooth_nashconv, label=f'Algorithm smooth: {alg}', c='royalblue')
+			plt.plot(iteration, smooth_nashconv, label=f'7-running average', c='royalblue')
 
 		plt.axhline(y=0.0, color = 'gray', linestyle = '--', alpha=0.5)
-		plt.xlabel('Train Iteration')
-		plt.ylabel('NashConv')
-		if len(args.algorithms) > 1:
-			plt.legend()
+		plt.xlabel(r'Training Iteration ($\tau$)')
+		plt.ylabel(r'NashConv$^\tau$'+f'({br_frac})')
+		plt.title(f'Running NashConv')
+		plt.legend()
 		plt.savefig('nashconv.pdf')
 
 
@@ -193,7 +206,7 @@ group_runner = GroupRunner(args)
 
 group_runner.run_optimization()
 #group_runner.nash_conv('2023-02-14_15-17', 0.1)
-#group_runner.plot_nash_conv('2023-02-14_15-17')
+#group_runner.plot_nash_conv('2023-02-14_15-17', 0.1)
 
 
 

@@ -2,6 +2,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pickle, os
 from Utils.misc import my_chdir
+import matplotlib as mpl
+
+mpl.rcParams.update({
+   'axes.labelsize': 10,
+   'font.size': 10,
+   'legend.fontsize': 10,
+   'xtick.labelsize': 8,
+   'ytick.labelsize': 8,
+   'figure.figsize': [5.5, 4.5]
+})
 
 
 def prepare_folders(algorithm, folder):
@@ -14,7 +24,7 @@ def prepare_folders(algorithm, folder):
 
 def draw_final_policy(algorithm, folder):
 	root = os.getcwd()
-	os.chdir(f'../Results/{algorithm}/{folder}')
+	os.chdir(f'../Results/Group/{folder}')
 	args = pickle.load(open('args.pickle', 'rb'))
 	os.chdir('policies')
 	final_policy = np.load(f'policy_{len(os.listdir(os.getcwd())) - 1}.npy')
@@ -68,8 +78,8 @@ def draw_leaving_counts(algorithm, folder):
 
 
 algorithm = 'PPO'
-folder = '2023-02-12_22-04'
-prepare_folders(algorithm, folder)
+folder = '_brs1_F4_Q6_T4_k2_x20_p0.5'
+prepare_folders('Group', folder)
 draw_final_policy(algorithm, folder)
 #draw_leaving_counts(algorithm, folder)
 
